@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePathname } from "next/navigation";
 import { useTranslation } from 'react-i18next';
+import Link from 'next/link';
 
 type Tab = {
   label: string;
@@ -16,11 +17,34 @@ interface HeaderProps {
   userRole?: string;
   avatarUrl?: string;
   showBell?: boolean;
+  offsetLeft?: number;
 }
 
-export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false }: HeaderProps) {
+export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false, offsetLeft = 80 }: HeaderProps) {
   const { t } = useTranslation();
   const pathname = usePathname()?.replace(/^\/+/, '') || '';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+  const notifRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (profileRef.current && !profileRef.current.contains(target)) setMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(target)) setNotifOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMenuOpen(false); setNotifOpen(false); }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
 
   const initials = (name?: string) => {
     if (!name) return '';
@@ -29,8 +53,8 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
   };
 
   return (
-    <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b shadow-sm w-full">
-      <div className="w-full px-6 py-3">
+    <header className="fixed top-0 z-20 bg-white border-b px-8" style={{ left: offsetLeft, right: 0 }}>
+      <div className="w-full py-3 pr-4 md:pr-6">
         {variant === 'compact' ? (
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0 flex items-center text-sm text-gray-500 whitespace-nowrap overflow-x-auto">
@@ -43,26 +67,116 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
             </div>
             <div className="flex items-center gap-4">
               {showBell && (
-                <button type="button" aria-label="Notifications" className="relative text-gray-500 hover:text-gray-700">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </button>
+                <div className="relative" ref={notifRef}>
+                  <button
+                    type="button"
+                    aria-label="Notifications"
+                    onClick={() => setNotifOpen((v) => !v)}
+                    className="relative text-gray-500 hover:text-gray-700"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
+                  </button>
+
+                  {notifOpen && (
+                    <div className="absolute right-0 mt-3 w-96 max-w-sm rounded-xl bg-white shadow-lg ring-1 ring-black/5 z-30">
+                      <div className="px-4 py-3 border-b flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-900">Notifications</div>
+                        <button className="text-xs text-gray-500 hover:text-gray-700" onClick={() => setNotifOpen(false)}>Close</button>
+                      </div>
+                      <ul className="max-h-80 overflow-auto divide-y">
+                        <li className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+                          <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-50 text-red-600 ring-1 ring-red-200">
+                            !
+                          </span>
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-900">XYZ pump haven't cycled in last 24 hours</div>
+                            <div className="text-xs text-gray-500">Critical</div>
+                          </div>
+                          <div className="text-xs text-gray-400 whitespace-nowrap">2 min</div>
+                        </li>
+                        <li className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+                          <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-200">!</span>
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-900">XYZ pump haven't cycled in last 24 hours</div>
+                            <div className="text-xs text-gray-500">Warning</div>
+                          </div>
+                          <div className="text-xs text-gray-400 whitespace-nowrap">2 min</div>
+                        </li>
+                        <li className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+                          <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-50 text-green-600 ring-1 ring-green-200">•</span>
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-900">All systems normal</div>
+                            <div className="text-xs text-gray-500">Normal</div>
+                          </div>
+                          <div className="text-xs text-gray-400 whitespace-nowrap">5 min</div>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
               )}
               {(userName || avatarUrl) && (
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-gray-700 text-sm">
-                    {avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={avatarUrl} alt={userName || 'User'} className="w-full h-full object-cover" />
-                    ) : (
-                      <span>{initials(userName)}</span>
-                    )}
-                  </div>
-                  <div className="leading-tight">
-                    {userName && <div className="text-sm text-gray-900">{userName}</div>}
-                    {userRole && <div className="text-xs text-gray-500">{userRole}</div>}
-                  </div>
+                <div className="relative" ref={profileRef}>
+                  <button type="button" onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-2 group">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center text-gray-700 text-sm font-semibold ring-1 ring-gray-300 shadow-sm">
+                      {avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatarUrl} alt={userName || 'User'} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{initials(userName)}</span>
+                      )}
+                    </div>
+                    <div className="leading-tight text-left hidden sm:block">
+                      {userName && <div className="text-sm text-gray-900">{userName}</div>}
+                      {userRole && <div className="text-xs text-gray-500">{userRole}</div>}
+                    </div>
+                  </button>
+
+                  {menuOpen && (
+                    <div className="absolute right-0 mt-3 w-72 rounded-xl bg-white shadow-lg ring-1 ring-black/5 z-30">
+                      <div className="px-4 py-3 flex items-center gap-3 border-b">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center text-gray-700 ring-1 ring-gray-300 shadow-sm">
+                          {avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={avatarUrl} alt={userName || 'User'} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-base font-semibold">{initials(userName)}</span>
+                          )}
+                        </div>
+                        <div className="leading-tight">
+                          {userName && <div className="text-sm font-medium text-gray-900">{userName}</div>}
+                          {userRole && <div className="text-xs text-gray-500">{userRole}</div>}
+                        </div>
+                      </div>
+
+                      <div className="py-2 text-sm">
+                        <div className="px-4 pb-1 text-xs font-semibold text-gray-500">Management</div>
+                        <Link href="/user-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                          <span>User Management</span>
+                        </Link>
+                        <Link href="/site-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                          <span>Site Management</span>
+                        </Link>
+                        <div className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500">Privacy</div>
+                        <Link href="/change-password" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                          <span>Change Password</span>
+                        </Link>
+                      </div>
+
+                      <div className="border-t px-4 py-2">
+                        <button
+                          type="button"
+                          className="text-red-600 hover:text-red-700 text-sm"
+                          onClick={() => setConfirmLogoutOpen(true)}
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -106,6 +220,34 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
           </div>
         )}
       </div>
+
+      {confirmLogoutOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4">
+            <div className="px-5 pt-5 pb-3">
+              <div className="text-base font-semibold text-gray-900">Log Out?</div>
+              <div className="mt-1 text-sm text-gray-600">Are you sure you want to log out? You can sign in again to access the dashboard.</div>
+            </div>
+            <div className="h-px bg-gray-200" />
+            <div className="px-5 py-3 flex items-center justify-end gap-3">
+              <button className="px-4 py-2 rounded-md border text-sm" onClick={() => setConfirmLogoutOpen(false)}>Cancel</button>
+              <button
+                className="px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm"
+                onClick={() => {
+                  try {
+                    document.cookie = 'AuthToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+                    window.location.href = '/login';
+                  } catch (_) {
+                    window.location.href = '/login';
+                  }
+                }}
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

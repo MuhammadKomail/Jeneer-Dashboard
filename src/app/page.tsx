@@ -14,14 +14,22 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import Collapse from '@mui/material/Collapse';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import CircularProgress from '@mui/material/CircularProgress';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
@@ -41,8 +49,9 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
   open?: boolean;
 }>(({ theme, open }) => ({
   flexGrow: 1,
-  padding: theme.spacing(3),
-  paddingTop: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  padding: 0,
   transition: theme.transitions.create('margin', {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
@@ -92,6 +101,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number>(1); // default to "User Management"
   const pathname = usePathname();
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const [expandedSite, setExpandedSite] = useState<string | null>(null);
+  const [selectedWell, setSelectedWell] = useState<string | null>(null);
+  const isDashboard = pathname === '/' || pathname.startsWith('/dashboard');
 
   useEffect(() => {
     const hasAuthToken = document.cookie.split(';').some((cookie) => cookie.trim().startsWith('AuthToken='));
@@ -99,6 +112,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const timeout = setTimeout(() => setIsLoaded(true), 500);
     return () => clearTimeout(timeout);
   }, []);
+
+  // Ensure Dashboard menu loads collapsed (no expanded site, no selected well)
+  useEffect(() => {
+    if (isDashboard) {
+      setExpandedSite(null);
+      setSelectedWell(null);
+    }
+  }, [isDashboard, pathname]);
 
   const handleDrawerToggle = () => {
     setOpen((prev) => !prev);
@@ -129,6 +150,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { text: 'User Management', href: '/user-management', icon: <ManageAccountsOutlinedIcon /> },
     { text: 'Site Management', href: '/site-management', icon: <RoomOutlinedIcon /> },
     { text: 'Change Password', href: '/change-password', icon: <LockOutlinedIcon /> },
+  ];
+
+  const dashboardSites: { site: string; wells: string[] }[] = [
+    { site: 'Broadhurst (Republic)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
+    { site: 'Chiquita Canyon (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348'] },
+    { site: 'Eagle Point (GFL)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322'] },
+    { site: 'Emerald Park (GFL)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Heart of Florida (WC)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Hickory Hill (WM)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Horror County', wells: ['Wellfield Overview'] },
+    { site: 'JED (WC)', wells: ['Wellfield Overview'] },
+    { site: 'LRI (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
   ];
 
   const userData = {
@@ -196,7 +229,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               height: '100vh',
               transition: 'width 0.3s ease',
               backgroundColor: '#0D542B',
-              borderTopRightRadius: '12px',
+              borderTopRightRadius: 0,
+              borderRight: 'none',
               boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
             },
           }}
@@ -211,80 +245,134 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
           <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
 
-          <List>
-            {navItems.map((item, idx) => {
-              // Robust selection logic to handle dashboard and other pages
-              const selected = (item.href === '/dashboard' && (pathname === '/' || pathname === '/dashboard')) || 
-                               (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
+          {(() => {
+            const isDashboard = pathname === '/' || pathname.startsWith('/dashboard');
+            if (isDashboard) {
               return (
-                <ListItem key={item.text} disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
-                  <ListItemButton
-                    component={Link}
-                    href={item.href} // Use the direct href for navigation
-                    selected={selected}
-                    onClick={() => setSelectedIdx(idx)}
-                    sx={{
-                      margin: '4px 8px',
-                      borderRadius: '8px',
-                      color: 'rgba(255,255,255,0.95)', // Default text and icon color
-                      '&.Mui-selected': {
-                        backgroundColor: 'white',
-                        color: '#0D542B', // Selected text and icon color
-                        '&:hover': {
-                          backgroundColor: 'white',
-                        },
-                      },
-                      '&:not(.Mui-selected):hover': {
-                        backgroundColor: 'rgba(255,255,255,0.08)',
-                      },
-                      justifyContent: !open ? 'center' : 'flex-start',
+                <List sx={{ color: 'rgba(255,255,255,0.95)' }}>
+                  {dashboardSites.map((group) => {
+                    const expanded = expandedSite === group.site;
+                    return (
+                      <React.Fragment key={group.site}>
+                        <ListItem disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
+                          <ListItemButton
+                            onClick={() => setExpandedSite(expanded ? null : group.site)}
+                            sx={{
+                              margin: '4px 8px',
+                              borderRadius: '8px',
+                              color: 'rgba(255,255,255,0.95)',
+                              backgroundColor: 'transparent',
+                              '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
+                              justifyContent: !open ? 'center' : 'flex-start',
+                            }}
+                          >
+                            {open ? (
+                              <ListItemText primary={group.site} />
+                            ) : (
+                              <ListItemText primary={group.site.split(' ')[0]} />
+                            )}
+                            {open && (expanded ? <ExpandLess sx={{ color: 'inherit' }} /> : <ExpandMore sx={{ color: 'inherit' }} />)}
+                          </ListItemButton>
+                        </ListItem>
+                        <Collapse in={expanded} timeout="auto" unmountOnExit>
+                          <List component="div" disablePadding>
+                            {group.wells.map((well) => {
+                              const id = `${group.site}__${well}`;
+                              const selected = selectedWell === id;
+                              return (
+                                <ListItem key={id} disablePadding sx={{ px: open ? 2 : 0, py: 0.25 }}>
+                                  <ListItemButton
+                                    onClick={() => setSelectedWell(id)}
+                                    sx={{
+                                      margin: '4px 8px',
+                                      borderRadius: '8px',
+                                      color: selected ? '#0D542B' : 'rgba(255,255,255,0.95)',
+                                      backgroundColor: selected ? '#DFF3D9' : 'transparent',
+                                      '&:hover': { backgroundColor: selected ? '#DFF3D9' : 'rgba(255,255,255,0.06)' },
+                                      justifyContent: !open ? 'center' : 'flex-start',
+                                    }}
+                                  >
+                                    {open && <ListItemText primary={well.startsWith('LRI') ? well : `${group.site.split(' ')[0]} ${well}`} />}
+                                  </ListItemButton>
+                                </ListItem>
+                              );
+                            })}
+                          </List>
+                        </Collapse>
+                      </React.Fragment>
+                    );
+                  })}
+                </List>
+              );
+            }
+            return (
+              <List>
+                {navItems.map((item, idx) => {
+                  const selected = (item.href === '/dashboard' && (pathname === '/' || pathname === '/dashboard')) ||
+                                   (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                  return (
+                    <ListItem key={item.text} disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
+                      <ListItemButton
+                        component={Link}
+                        href={item.href}
+                        selected={selected}
+                        onClick={() => setSelectedIdx(idx)}
+                        sx={{
+                          margin: '4px 8px',
+                          borderRadius: '8px',
+                          color: 'rgba(255,255,255,0.95)',
+                          '&.Mui-selected': {
+                            backgroundColor: 'white',
+                            color: '#0D542B',
+                            '&:hover': { backgroundColor: 'white' },
+                          },
+                          '&:not(.Mui-selected):hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
+                          justifyContent: !open ? 'center' : 'flex-start',
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{ minWidth: 0, justifyContent: 'center', color: 'inherit', width: '40px' }}
+                        >
+                          {React.cloneElement(item.icon as any, { sx: { color: 'inherit' } })}
+                        </ListItemIcon>
+                        {open && <ListItemText primary={item.text} />}
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            );
+          })()}
+
+          {!isDashboard && (
+            <Box sx={{ position: 'absolute', bottom: 0, width: '100%', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+              <ListItem disablePadding style={{ color: 'white' }}>
+                <ListItemButton
+                  onClick={() => setConfirmLogoutOpen(true)}
+                  disabled={isLoggingOut}
+                  sx={{ justifyContent: !open ? 'center' : 'flex-start' }}
+                >
+                  <ListItemIcon
+                    style={{
+                      marginLeft: !open ? '0' : '0px',
+                      width: '40px',
+                      minWidth: !open ? '0' : '40px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      color: 'inherit',
                     }}
                   >
-                    <ListItemIcon
-                      sx={{
-                        minWidth: 0,
-                        justifyContent: 'center',
-                        color: 'inherit', // Force icon to inherit color from parent
-                        width: '40px',
-                      }}
-                    >
-                      {item.icon}
-                    </ListItemIcon>
-                    {open && <ListItemText primary={item.text} />}
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </List>
-
-          <Box sx={{ position: 'absolute', bottom: 0, width: '100%', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-            <ListItem disablePadding style={{ color: 'white' }}>
-              <ListItemButton
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                sx={{ justifyContent: !open ? 'center' : 'flex-start' }}
-              >
-                <ListItemIcon
-                  style={{
-                    marginLeft: !open ? '0' : '0px',
-                    width: '40px',
-                    minWidth: !open ? '0' : '40px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    color: 'inherit',
-                  }}
-                >
-                  {isLoggingOut ? (
-                    <CircularProgress size={20} sx={{ color: 'white' }} />
-                  ) : (
-                    <LogoutOutlinedIcon />
-                  )}
-                </ListItemIcon>
-                {open && <ListItemText primary={isLoggingOut ? 'Logging out...' : 'Logout'} />}
-              </ListItemButton>
-            </ListItem>
-          </Box>
+                    {isLoggingOut ? (
+                      <CircularProgress size={20} sx={{ color: 'white' }} />
+                    ) : (
+                      <LogoutOutlinedIcon sx={{ color: 'white' }} />
+                    )}
+                  </ListItemIcon>
+                  {open && <ListItemText primary={isLoggingOut ? 'Logging out...' : 'Logout'} />}
+                </ListItemButton>
+              </ListItem>
+            </Box>
+          )}
         </Drawer>
 
         <Main open={open}>
@@ -301,6 +389,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 showBell
                 userName="John Doe"
                 userRole="Admin"
+                offsetLeft={open ? drawerWidth : drawerNarrowWidth}
               />
             );
           })()}
@@ -309,17 +398,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               padding: '24px',
               display: 'flex',
               flexDirection: 'column',
-              borderRadius: '8px',
-              maxWidth: '100%',
-              width: '100%',
-              margin: '0 auto',
-              backgroundColor: '#fff',
+              flexGrow: 1,
+              overflow: 'auto',
+              backgroundColor: 'transparent',
+              mt: '64px',
             }}
           >
             {children}
           </Box>
         </Main>
       </Box>
+
+      <Dialog open={confirmLogoutOpen} onClose={() => setConfirmLogoutOpen(false)}>
+        <DialogTitle>Log Out?</DialogTitle>
+        <DialogContent>
+          Are you sure you want to log out? You can sign in again to access the dashboard.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmLogoutOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="success" onClick={handleLogout} disabled={isLoggingOut}>Log Out</Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={logoutSuccess}

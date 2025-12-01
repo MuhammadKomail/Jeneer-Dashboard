@@ -11,26 +11,24 @@ export function middleware(req: NextRequest): NextResponse | void {
     const jwt = req.cookies.get('AuthToken')?.value;
     const userObject = req.cookies.get('user_object')?.value;
 
-    // Handle root paths to avoid 404 and route based on auth state
-    if (pathname === '/' || pathname === '/admin') {
-        const dest = isUserLoggedIn
-            ? `/admin${authenticatedRoutes[0]}` // /admin/dashboard
-            : `/admin${unAuthenticatedRoutes[0]}`; // /admin/login
-        return NextResponse.redirect(new URL(dest, req.url));
-    }
+    // Remove /admin prefix from pathname for route matching since basePath handles it
+    const normalizedPath = pathname.replace('/admin', '') || '/';
 
-    // Normalize plain /login to /admin/login
-    if (pathname === '/login') {
-        return NextResponse.redirect(new URL(`/admin${unAuthenticatedRoutes[0]}`, req.url));
+    // Handle root path and redirect based on auth state
+    if (normalizedPath === '/') {
+        const dest = isUserLoggedIn
+            ? authenticatedRoutes[0] // /dashboard
+            : unAuthenticatedRoutes[0]; // /login
+        return NextResponse.redirect(new URL(`/admin${dest}`, req.url));
     }
 
     // If we have a valid user object and trying to access login page, redirect to dashboard
-    if (userObject && unAuthenticatedRoutes.includes(pathname.replace('/admin', ''))) {
+    if (userObject && unAuthenticatedRoutes.includes(normalizedPath)) {
         return NextResponse.redirect(new URL(`/admin${authenticatedRoutes[0]}`, req.url));
     }
 
     // If JWT doesn't exist but trying to access authenticated pages, redirect to login
-    if (!jwt && authenticatedRoutes.includes(pathname.replace('/admin', ''))) {
+    if (!jwt && authenticatedRoutes.includes(normalizedPath)) {
         return NextResponse.redirect(new URL(`/admin${unAuthenticatedRoutes[0]}`, req.url));
     }
 
@@ -41,14 +39,14 @@ export function middleware(req: NextRequest): NextResponse | void {
 
     // Handle unauthenticated users
     if (!isUserLoggedIn) {
-        if (authenticatedRoutes.includes(pathname.replace('/admin', ''))) {
+        if (authenticatedRoutes.includes(normalizedPath)) {
             return NextResponse.redirect(new URL(`/admin${unAuthenticatedRoutes[0]}`, req.url));
         }
     }
 
     // Handle authenticated users
     if (isUserLoggedIn) {
-        if (unAuthenticatedRoutes.includes(pathname.replace('/admin', ''))) {
+        if (unAuthenticatedRoutes.includes(normalizedPath)) {
             return NextResponse.redirect(new URL(`/admin${authenticatedRoutes[0]}`, req.url));
         }
     }

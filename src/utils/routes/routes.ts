@@ -11,6 +11,9 @@ import {
 
 const unAuthenticatedRoutes = [
     "/login",
+    "/forgot-password",
+    "/verify-code",
+    "/new-password",
 ];
 
 const authenticatedRoutes = [

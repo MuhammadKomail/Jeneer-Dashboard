@@ -27,7 +27,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
   const pathName = usePathname();
 
   // Check if current route requires SidebarProvider
-  const excludesSidebar = ["/login", "/register", "/forgot-password", "/reset-password"]; // Pages that DO NOT need SidebarProvider
+  const excludesSidebar = ["/login", "/register", "/forgot-password", "/verify-code", "/new-password"]; // Auth pages: render without dashboard shell
   const requiresSidebar = !excludesSidebar.includes(pathName);
 
   const [isOnline, setIsOnline] = useState(true);
@@ -50,7 +50,11 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
     <html lang="en">
       <head>
-        <title>xource-AI - Admin</title>
+        <title>Jeneer - Admin</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <meta name="theme-color" content="#0D542B" />
       </head>
       <body suppressHydrationWarning={true} className='font-Mulish'>
         {isOnline ? null : <NoInternet />}
@@ -67,9 +71,10 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
                 <AppLayOut>{children}</AppLayOut>
               </SidebarProvider>
             ) : (
+              // For auth pages, render children directly without dashboard shell
               <>
                 <CssBaseline />
-                <AppLayOut>{children}</AppLayOut>
+                {children}
               </>
             )}
           </PersistGate>

@@ -19,6 +19,7 @@ import { assetPaths } from "@/paths/path";
 import styles from "./login.module.css";
 import messages from "@/utils/messages/messages";
 import { useTranslation } from 'react-i18next';
+import leftImage from "@/assets/images/login-side.png";
 
 interface FormStates {
   email: string;
@@ -194,33 +195,30 @@ const LogIn: React.FC = () => {
 
   return (
     <div className={styles.authMainContainer}>
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className={`w-full max-w-md relative ${styles.innerauthMainContainer}`}>
-          {/* <div>
-            <Image
-              className={`d-block ${styles.LoginLeftImg}`}
-              src={assetPaths.LoginLeftImg}
-              alt="left-image"
-              width={100}
-            />
-          </div> */}
-          <div className="bg-white shadow-2xl rounded-lg p-10 sm:p-10">
-            <div className={styles.mainXourceLogo}>
+      <div className="min-h-screen md:flex bg-white">
+        <div className="hidden md:block relative md:min-h-screen md:basis-1/2 overflow-hidden">
+          <Image src={leftImage} alt="left-image" fill priority sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8 sm:p-12 bg-white md:rounded-r-[3px] shadow-xl">
+          <div className="w-full max-w-lg">
+            {/* <div className={styles.mainXourceLogo}>
               <Image
                 className={`d-block ${styles.XourceIcon}`}
                 src={assetPaths.XourceIcon}
                 alt="xource-logo"
                 width={70}
               />
-            </div>
-            <h2 className="text-xl sm:text-3xl text-center mb-1 sm:mb-4 text-black">
-              Sign In
+            </div> */}
+            <h2 className="text-2xl sm:text-4xl font-semibold mb-2 text-black text-left">
+              Welcome Back! 
+              <br />
+              Sign In to see latest updates.
             </h2>
-            <p className="text-center text-sm sm:text-base text-gray mb-4 sm:mb-6">
-              Welcome to Xource.AI
+            <p className="text-gray mb-8 text-left">
+              Access your pump insights and operational data securely.
             </p>
             <div className="space-y-4">
-              <div className="space-y-2 pb-4">
+              <div className="space-y-2 pb-2">
                 <Label htmlFor="email" className="text-sm text-black font-bold">
                   Email
                 </Label>
@@ -232,24 +230,22 @@ const LogIn: React.FC = () => {
                   className="text-sm text-gray p-5"
                 />
               </div>
-              <div className="relative space-y-2 pb-4">
+              <div className="relative space-y-2 pb-2">
                 <Label htmlFor="password" className="text-sm text-black font-bold">
                   Password
                 </Label>
                 <Input
                   id="password"
                   type={formStates.showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder="Password"
                   value={formStates.password}
                   onChange={handleInputChange}
                   className={`text-sm text-gray p-5 ${currentLang === 'ar' ? 'pr-3 pl-10' : 'pl-3 pr-10'}`}
-                  style={{
-                    direction: currentLang === 'ar' ? 'rtl' : 'ltr'
-                  }}
+                  style={{ direction: currentLang === 'ar' ? 'rtl' : 'ltr' }}
                 />
                 <button
                   type="button"
-                  className={`absolute inset-y-0 top-3 flex items-center text-xs sm:text-sm leading-5 text-main hover:text-main ${currentLang === 'ar' ? 'left-0 pl-3' : 'right-0 pr-3'}`}
+                  className={`absolute inset-y-0 top-3 flex items-center text-xs sm:text-sm leading-5 text-[#3BA049] hover:text-[#33913F] ${currentLang === 'ar' ? 'left-0 pl-3' : 'right-0 pr-3'}`}
                   onClick={handleClickShowPassword}
                   aria-label={formStates.showPassword ? 'Hide password' : 'Show password'}
                   tabIndex={0}
@@ -257,27 +253,26 @@ const LogIn: React.FC = () => {
                   {formStates.showPassword ? <IoEye size={20} /> : <IoEyeOff size={20} />}
                 </button>
               </div>
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="remember" checked={formStates.rememberMe} onCheckedChange={handleRememberMeChange} />
+                  <label htmlFor="remember" className="text-sm text-black">Remember me</label>
+                </div>
+                <Link href="/forgot-password" className="text-sm text-[#3BA049] hover:text-[#33913F]">Recover password</Link>
+              </div>
               {formStates.loader ? (
-                <Dots className="text-center bg-main hover:bg-main text-sm sm:text-base py-3 sm:py-3 rounded-md text-white" />
+                <Dots className="text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white" />
               ) : (
                 <Button
-                  className="w-full text-center bg-main hover:bg-main text-sm sm:text-base py-3 sm:py-3 rounded-md text-white"
+                  className="w-full text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white"
                   onClick={logInHandler}
                   type="submit"
                 >
-                  Sign In
+                  Login
                 </Button>
               )}
             </div>
           </div>
-          {/* <div>
-            <Image
-              className={`d-block ${styles.LoginRightImg}`}
-              src={assetPaths.LoginRightImg}
-              alt="right-image"
-              width={100}
-            />
-          </div> */}
         </div>
       </div>
     </div>
