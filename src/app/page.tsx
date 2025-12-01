@@ -22,8 +22,17 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CircularProgress from '@mui/material/CircularProgress';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
+import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
 import { assetPaths } from '@/paths/path';
+import NavigineHeader from "@/components/navigine header/navigine header";
 
 const drawerWidth = 240;
 const drawerNarrowWidth = 80;
@@ -81,6 +90,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [logoutSuccess, setLogoutSuccess] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number>(1); // default to "User Management"
   const pathname = usePathname();
 
   useEffect(() => {
@@ -114,11 +124,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return <div>{children}</div>;
   }
 
-  const navigationItems = [
-    { text: 'Computer Vision', icon: '/icons/cv.png', path: '/cv' },
-    { text: 'NLP', icon: '/icons/nlp.png', path: '/nlp' },
-    { text: 'Forecasting', icon: '/icons/forecasting.png', path: '/forecasting' },
-    { text: 'GEN AI', icon: '/icons/cv.png', path: '/vlm' },
+  const navItems = [
+    { text: 'Dashboard', href: '/dashboard', icon: <DashboardOutlinedIcon /> },
+    { text: 'User Management', href: '/user-management', icon: <ManageAccountsOutlinedIcon /> },
+    { text: 'Site Management', href: '/site-management', icon: <RoomOutlinedIcon /> },
+    { text: 'Change Password', href: '/change-password', icon: <LockOutlinedIcon /> },
   ];
 
   const userData = {
@@ -130,15 +140,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <CssBaseline />
-      <AppBar position="fixed" style={{ backgroundColor: '#fff' }}>
-        <Toolbar>
-          <Link href="/dashboard">
-            <Image src={assetPaths.XourceLogo} alt="Logo" priority width={170} height={70} style={{ objectFit: 'contain', cursor: 'pointer' }} />
+      {/* <AppBar position="fixed" style={{ backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}>
+        <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Image src={assetPaths.XourceLogo} alt="Logo" width={120} height={40} priority />
           </Link>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton size="small">
+              <NotificationsNoneOutlinedIcon />
+            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AccountCircleOutlinedIcon />
+              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>John Doe</Typography>
+                <Typography variant="caption" color="text.secondary">Admin</Typography>
+              </Box>
+            </Box>
+          </Box>
         </Toolbar>
-      </AppBar>
+      </AppBar> */}
 
-      <Box sx={{ display: 'flex', marginTop: '70px' }}>
+      <Box sx={{ display: 'flex', marginTop: '0px' }}>
         <IconButton
           onClick={handleDrawerToggle}
           style={{
@@ -148,7 +170,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             height: 24,
             boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.2)',
             position: 'fixed',
-            top: 150,
+            top: 40,
             left: (open ? drawerWidth : drawerNarrowWidth) - 12,
             zIndex: 9999,
             display: 'flex',
@@ -170,74 +192,74 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             '& .MuiDrawer-paper': {
               width: open ? drawerWidth : drawerNarrowWidth,
               boxSizing: 'border-box',
-              top: '70px',
-              height: 'calc(100vh - 70px)',
+              top: '0px',
+              height: '100vh',
               transition: 'width 0.3s ease',
-              backgroundColor: '#ffffff',
-              color: '#333333',
+              backgroundColor: '#0D542B',
+              borderTopRightRadius: '12px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
             },
           }}
           variant="persistent"
           anchor="left"
           open={true}
         >
-          <ProfileSection open={open}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Image
-                src={userData.profilePic}
-                alt="Profile Picture"
-                width={open ? 35 : 40}
-                height={open ? 35 : 40}
-                style={{ objectFit: 'contain' }}
-              />
-            </Box>
-            {open && (
-              <Box>
-                <ListItemText primary={userData.name} primaryTypographyProps={{ fontWeight: 'bold' }} />
-                <ListItemText primary={userData.email} primaryTypographyProps={{ fontSize: '0.875rem', color: '#929292' }} />
-              </Box>
-            )}
-          </ProfileSection>
+          {/* Sidebar logo/header block */}
+          <Box sx={{ px: 2, py: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Image src={assetPaths.XourceLogo} alt="Sidebar Logo" width={open ? 140 : 36} height={open ? 32 : 36} style={{ objectFit: 'contain' }} />
+          </Box>
 
-          <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.12)' }} />
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
 
           <List>
-            {navigationItems.map((item) => {
-              const isActive = pathname === item.path;
+            {navItems.map((item, idx) => {
+              // Robust selection logic to handle dashboard and other pages
+              const selected = (item.href === '/dashboard' && (pathname === '/' || pathname === '/dashboard')) || 
+                               (item.href !== '/dashboard' && pathname.startsWith(item.href));
+
               return (
-                <ListItem key={item.text} disablePadding style={{ color: isActive ? '#1976d2' : '#929292' }}>
-                  <Link href={item.path} style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
-                    <ListItemButton
-                      selected={isActive}
+                <ListItem key={item.text} disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
+                  <ListItemButton
+                    component={Link}
+                    href={item.href} // Use the direct href for navigation
+                    selected={selected}
+                    onClick={() => setSelectedIdx(idx)}
+                    sx={{
+                      margin: '4px 8px',
+                      borderRadius: '8px',
+                      color: 'rgba(255,255,255,0.95)', // Default text and icon color
+                      '&.Mui-selected': {
+                        backgroundColor: 'white',
+                        color: '#0D542B', // Selected text and icon color
+                        '&:hover': {
+                          backgroundColor: 'white',
+                        },
+                      },
+                      '&:not(.Mui-selected):hover': {
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                      },
+                      justifyContent: !open ? 'center' : 'flex-start',
+                    }}
+                  >
+                    <ListItemIcon
                       sx={{
-                        justifyContent: !open ? 'center' : 'flex-start',
-                        padding: !open ? '10px 0' : undefined,
+                        minWidth: 0,
+                        justifyContent: 'center',
+                        color: 'inherit', // Force icon to inherit color from parent
+                        width: '40px',
                       }}
                     >
-                      <ListItemIcon
-                        style={{
-                          marginLeft: !open ? '0' : '0px',
-                          width: '40px',
-                          minWidth: !open ? '0' : '40px',
-                          marginTop: !open ? '10px' : '0px',
-                          marginBottom: !open ? '10px' : '0px',
-                          color: isActive ? '#1976d2' : 'inherit',
-                          display: 'flex',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Image src={item.icon} alt={item.text} width={20} height={20} />
-                      </ListItemIcon>
-                      {open && <ListItemText primary={item.text} />}
-                    </ListItemButton>
-                  </Link>
+                      {item.icon}
+                    </ListItemIcon>
+                    {open && <ListItemText primary={item.text} />}
+                  </ListItemButton>
                 </ListItem>
               );
             })}
           </List>
 
-          <Box sx={{ position: 'absolute', bottom: 0, width: '100%', borderTop: '1px solid rgba(0, 0, 0, 0.12)' }}>
-            <ListItem disablePadding style={{ color: 'red' }}>
+          <Box sx={{ position: 'absolute', bottom: 0, width: '100%', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+            <ListItem disablePadding style={{ color: 'white' }}>
               <ListItemButton
                 onClick={handleLogout}
                 disabled={isLoggingOut}
@@ -250,12 +272,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     minWidth: !open ? '0' : '40px',
                     display: 'flex',
                     justifyContent: 'center',
+                    color: 'inherit',
                   }}
                 >
                   {isLoggingOut ? (
-                    <CircularProgress size={20} color="error" />
+                    <CircularProgress size={20} sx={{ color: 'white' }} />
                   ) : (
-                    <Image src="/icons/logout.png" alt="Logout" width={20} height={20} />
+                    <LogoutOutlinedIcon />
                   )}
                 </ListItemIcon>
                 {open && <ListItemText primary={isLoggingOut ? 'Logging out...' : 'Logout'} />}
@@ -265,6 +288,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         </Drawer>
 
         <Main open={open}>
+          {/* Top header aligned with the main content area */}
+          {(() => {
+            const currentPath = pathname === '/' ? '/dashboard' : pathname;
+            const current = navItems.find((n) => currentPath.startsWith(n.href));
+            const title = current?.text || 'Dashboard';
+            return (
+              <NavigineHeader
+                title={title}
+                variant="compact"
+                trail={[title]}
+                showBell
+                userName="John Doe"
+                userRole="Admin"
+              />
+            );
+          })()}
           <Box
             sx={{
               padding: '24px',
