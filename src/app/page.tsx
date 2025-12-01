@@ -17,7 +17,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Collapse from '@mui/material/Collapse';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandLess from '@mui/icons-material/ExpandLess';
@@ -38,9 +38,12 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import Typography from '@mui/material/Typography';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { assetPaths } from '@/paths/path';
 import NavigineHeader from "@/components/navigine header/navigine header";
+import Overview from "@/components/dashboard/Overview";
+import HistoryPage from "@/components/dashboard/HistoryPage";
+import SettingsPage from "@/components/dashboard/SettingsPage";
 
 const drawerWidth = 240;
 const drawerNarrowWidth = 80;
@@ -105,6 +108,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [selectedWell, setSelectedWell] = useState<string | null>(null);
   const isDashboard = pathname === '/' || pathname.startsWith('/dashboard');
+  const didInitDefaultRef = useRef(false);
+  const searchParams = useSearchParams();
+
+  // Initialize sidebar openness: desktop open, mobile collapsed
+  useEffect(() => {
+    try {
+      const isDesktop = window.innerWidth >= 1024; // ~Tailwind lg breakpoint
+      setOpen(isDesktop);
+    } catch (_) {
+      // noop for SSR
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const hasAuthToken = document.cookie.split(';').some((cookie) => cookie.trim().startsWith('AuthToken='));
@@ -113,9 +130,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Ensure Dashboard menu loads collapsed (no expanded site, no selected well)
+  // Reset selections when leaving dashboard
   useEffect(() => {
-    if (isDashboard) {
+    if (!isDashboard) {
       setExpandedSite(null);
       setSelectedWell(null);
     }
@@ -137,6 +154,35 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     }, 2000);
   };
 
+  // Sites list used across Dashboard
+  const dashboardSites: { site: string; wells: string[] }[] = [
+    { site: 'Broadhurst (Republic)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
+    { site: 'Chiquita Canyon (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348'] },
+    { site: 'Eagle Point (GFL)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322'] },
+    { site: 'Emerald Park (GFL)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Heart of Florida (WC)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Hickory Hill (WM)', wells: ['Wellfield Overview', 'LRI2306'] },
+    { site: 'Horror County', wells: ['Wellfield Overview'] },
+    { site: 'JED (WC)', wells: ['Wellfield Overview'] },
+    { site: 'LRI (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
+  ];
+
+  // Dashboard default selection: run only once per dashboard session
+  useEffect(() => {
+    if (!isDashboard) return;
+    if (didInitDefaultRef.current) return;
+    const target = 'LRI (WC)';
+    const group = dashboardSites.find((g) => g.site === target);
+    setExpandedSite(target);
+    const wells = group?.wells || [];
+    const defaultWell = wells.includes('Wellfield Overview') ? 'Wellfield Overview' : wells[0];
+    if (defaultWell) {
+      setSelectedWell(`${target}__${defaultWell}`);
+    }
+    didInitDefaultRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDashboard]);
+
   if (!isLoaded || isAuthenticated === null) {
     return null;
   }
@@ -152,17 +198,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { text: 'Change Password', href: '/change-password', icon: <LockOutlinedIcon /> },
   ];
 
-  const dashboardSites: { site: string; wells: string[] }[] = [
-    { site: 'Broadhurst (Republic)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
-    { site: 'Chiquita Canyon (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348'] },
-    { site: 'Eagle Point (GFL)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322'] },
-    { site: 'Emerald Park (GFL)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Heart of Florida (WC)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Hickory Hill (WM)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Horror County', wells: ['Wellfield Overview'] },
-    { site: 'JED (WC)', wells: ['Wellfield Overview'] },
-    { site: 'LRI (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
-  ];
 
   const userData = {
     name: 'Demo User',
@@ -252,24 +287,40 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 <List sx={{ color: 'rgba(255,255,255,0.95)' }}>
                   {dashboardSites.map((group) => {
                     const expanded = expandedSite === group.site;
+                    // Parent is selected only if this site is expanded AND no child well from this site is selected
+                    const parentSelected = expanded && !(selectedWell && selectedWell.startsWith(`${group.site}__`));
                     return (
                       <React.Fragment key={group.site}>
-                        <ListItem disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
+                        <ListItem disablePadding sx={{ px: open ? 1 : 0, py: open ? 0.5 : 0.25 }}>
                           <ListItemButton
-                            onClick={() => setExpandedSite(expanded ? null : group.site)}
+                            onClick={() => {
+                              const nextExpanded = expanded ? null : group.site;
+                              setExpandedSite(nextExpanded);
+                              // When expanding a site, clear child selection so only the parent shows as selected.
+                              if (!expanded) setSelectedWell(null);
+                            }}
                             sx={{
                               margin: '4px 8px',
                               borderRadius: '8px',
-                              color: 'rgba(255,255,255,0.95)',
-                              backgroundColor: 'transparent',
-                              '&:hover': { backgroundColor: 'rgba(255,255,255,0.08)' },
+                              color: parentSelected ? '#0D542B' : 'rgba(255,255,255,0.95)',
+                              backgroundColor: parentSelected ? '#DFF3D9' : 'transparent',
+                              '&:hover': { backgroundColor: parentSelected ? '#DFF3D9' : 'rgba(255,255,255,0.08)' },
                               justifyContent: !open ? 'center' : 'flex-start',
+                              px: open ? 2 : 1,
+                              py: open ? 1 : 0.25,
+                              fontWeight: parentSelected ? 600 : undefined,
                             }}
                           >
                             {open ? (
-                              <ListItemText primary={group.site} />
+                              <ListItemText
+                                primary={group.site}
+                                primaryTypographyProps={{ fontSize: '0.95rem', lineHeight: 1.2 }}
+                              />
                             ) : (
-                              <ListItemText primary={group.site.split(' ')[0]} />
+                              <ListItemText
+                                primary={group.site.split(' ')[0]}
+                                primaryTypographyProps={{ fontSize: '0.75rem', lineHeight: 1.1, textAlign: 'center' }}
+                              />
                             )}
                             {open && (expanded ? <ExpandLess sx={{ color: 'inherit' }} /> : <ExpandMore sx={{ color: 'inherit' }} />)}
                           </ListItemButton>
@@ -279,8 +330,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                             {group.wells.map((well) => {
                               const id = `${group.site}__${well}`;
                               const selected = selectedWell === id;
+                              const compactLabel = well.startsWith('LRI')
+                                ? well
+                                : `${group.site.split(' ')[0]} ${well}`;
                               return (
-                                <ListItem key={id} disablePadding sx={{ px: open ? 2 : 0, py: 0.25 }}>
+                                <ListItem key={id} disablePadding sx={{ px: open ? 2 : 0, py: open ? 0.25 : 0.125 }}>
                                   <ListItemButton
                                     onClick={() => setSelectedWell(id)}
                                     sx={{
@@ -290,9 +344,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                                       backgroundColor: selected ? '#DFF3D9' : 'transparent',
                                       '&:hover': { backgroundColor: selected ? '#DFF3D9' : 'rgba(255,255,255,0.06)' },
                                       justifyContent: !open ? 'center' : 'flex-start',
+                                      px: open ? 2 : 1,
+                                      py: open ? 0.5 : 0.25,
                                     }}
                                   >
-                                    {open && <ListItemText primary={well.startsWith('LRI') ? well : `${group.site.split(' ')[0]} ${well}`} />}
+                                    {open ? (
+                                      <ListItemText primary={compactLabel} />
+                                    ) : (
+                                      <ListItemText
+                                        primary={compactLabel}
+                                        primaryTypographyProps={{ fontSize: '0.7rem', lineHeight: 1.1, textAlign: 'center' }}
+                                      />
+                                    )}
                                   </ListItemButton>
                                 </ListItem>
                               );
@@ -380,12 +443,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {(() => {
             const currentPath = pathname === '/' ? '/dashboard' : pathname;
             const current = navItems.find((n) => currentPath.startsWith(n.href));
-            const title = current?.text || 'Dashboard';
+            let title = current?.text || 'Dashboard';
+            let trail: string[] = [title];
+
+            // Dashboard specific breadcrumb based on selection
+            if (current?.href === '/dashboard') {
+              if (selectedWell) {
+                const [site, well] = selectedWell.split('__');
+                title = well || title;
+                trail = [site, well];
+              } else if (expandedSite) {
+                title = expandedSite;
+                trail = [expandedSite];
+              }
+            }
+
             return (
               <NavigineHeader
                 title={title}
                 variant="compact"
-                trail={[title]}
+                trail={trail}
                 showBell
                 userName="John Doe"
                 userRole="Admin"
@@ -404,7 +481,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               mt: '64px',
             }}
           >
-            {children}
+            {(() => {
+              const well = selectedWell ? selectedWell.split('__')[1] : null;
+              const view = searchParams?.get('view');
+              if (!isDashboard) return children;
+              if (view === 'history') return <HistoryPage />; // forced full-page history
+              if (view === 'settings') return <SettingsPage />; // forced full-page settings
+              if (well === 'Wellfield Overview') return <Overview />;
+              if (well) return <HistoryPage />; // full page table for specific well
+              return children;
+            })()}
           </Box>
         </Main>
       </Box>

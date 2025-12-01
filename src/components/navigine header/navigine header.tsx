@@ -25,7 +25,7 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
   const pathname = usePathname()?.replace(/^\/+/, '') || '';
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 
@@ -152,16 +152,16 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
                         </div>
                       </div>
 
-                      <div className="py-2 text-sm">
+                      <div className="py-2 text-sm select-none">
                         <div className="px-4 pb-1 text-xs font-semibold text-gray-500">Management</div>
-                        <Link href="/user-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                        <Link href="/user-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                           <span>User Management</span>
                         </Link>
-                        <Link href="/site-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                        <Link href="/site-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                           <span>Site Management</span>
                         </Link>
                         <div className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500">Privacy</div>
-                        <Link href="/change-password" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                        <Link href="/change-password" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                           <span>Change Password</span>
                         </Link>
                       </div>
@@ -170,7 +170,12 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
                         <button
                           type="button"
                           className="text-red-600 hover:text-red-700 text-sm"
-                          onClick={() => setConfirmLogoutOpen(true)}
+                          onClick={() => {
+                            try {
+                              document.cookie = 'AuthToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+                            } catch (_) {}
+                            window.location.href = '/login';
+                          }}
                         >
                           Logout
                         </button>
@@ -221,33 +226,6 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
         )}
       </div>
 
-      {confirmLogoutOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4">
-            <div className="px-5 pt-5 pb-3">
-              <div className="text-base font-semibold text-gray-900">Log Out?</div>
-              <div className="mt-1 text-sm text-gray-600">Are you sure you want to log out? You can sign in again to access the dashboard.</div>
-            </div>
-            <div className="h-px bg-gray-200" />
-            <div className="px-5 py-3 flex items-center justify-end gap-3">
-              <button className="px-4 py-2 rounded-md border text-sm" onClick={() => setConfirmLogoutOpen(false)}>Cancel</button>
-              <button
-                className="px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm"
-                onClick={() => {
-                  try {
-                    document.cookie = 'AuthToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-                    window.location.href = '/login';
-                  } catch (_) {
-                    window.location.href = '/login';
-                  }
-                }}
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }
