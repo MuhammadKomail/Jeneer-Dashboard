@@ -487,8 +487,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               if (!isDashboard) return children;
               if (view === 'history') return <HistoryPage />; // forced full-page history
               if (view === 'settings') return <SettingsPage />; // forced full-page settings
-              if (well === 'Wellfield Overview') return <Overview />;
-              if (well) return <HistoryPage />; // full page table for specific well
+              // For any selected well (including 'Wellfield Overview'), show the dashboard Overview
+              if (well) return <Overview />;
               return children;
             })()}
           </Box>
