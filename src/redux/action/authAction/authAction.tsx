@@ -21,11 +21,20 @@ export const logInUser = createAsyncThunk<UserDataResponse | null, LoginData>(
         },
         body: JSON.stringify(userData),
       });
-
+      console.log('Response login ::::', response)
       if (!response.ok) {
-        const errorMessage = await response.text(); // Read error message from response
-        // console.error('Login failed with status:', response.status, 'Message:', errorMessage);
-        return rejectWithValue(errorMessage || "Login failed");
+        // Prefer JSON error with a friendly message from the API route
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          try {
+            const j = await response.json();
+            return rejectWithValue(j?.message || "Login failed");
+          } catch (e) {
+            // fallthrough to text
+          }
+        }
+        const txt = await response.text();
+        return rejectWithValue(txt && !txt.startsWith("<!DOCTYPE html>") ? txt : "Login failed");
       }
 
       const result: LoginResponse = await response.json();

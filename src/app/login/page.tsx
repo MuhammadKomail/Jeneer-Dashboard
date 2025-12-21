@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import leftImage from "@/assets/images/login-side.png";
 
 interface FormStates {
-  email: string;
+  username: string;
   password: string;
   loader: boolean;
   showPassword: boolean;
@@ -42,7 +42,7 @@ const LogIn: React.FC = () => {
   const { error, user, loading } = useAppSelector((state) => state.authStates);
 
   const [formStates, setFormStates] = useState<FormStates>({
-    email: "",
+    username: "",
     password: "",
     loader: false,
     showPassword: false,
@@ -54,10 +54,10 @@ const LogIn: React.FC = () => {
 
   // Load saved credentials from cookies on component mount
   useEffect(() => {
-    if (hasCookie("rememberedEmail") && hasCookie("rememberedPassword")) {
+    if (hasCookie("rememberedUsername") && hasCookie("rememberedPassword")) {
       setFormStates((prevState) => ({
         ...prevState,
-        email: getCookie("rememberedEmail") as string,
+        username: getCookie("rememberedUsername") as string,
         password: getCookie("rememberedPassword") as string,
         rememberMe: true,
       }));
@@ -84,7 +84,7 @@ const LogIn: React.FC = () => {
 
   const clearStates = () => {
     setFormStates({
-      email: "",
+      username: "",
       password: "",
       loader: false,
       showPassword: false,
@@ -105,6 +105,17 @@ const LogIn: React.FC = () => {
   };
 
   const resHandler = (res: any) => {
+    // If we received a plain string message (e.g., from thunk rejection), show it directly
+    if (res && typeof res?.message === 'string' && !res?.status) {
+      setFormStates({
+        ...formStates,
+        loader: false,
+        showToast: true,
+        message: res.message,
+        messageStatus: messages.error,
+      });
+      return;
+    }
     if (res && res?.message === "Network Error") {
       setFormStates({
         ...formStates,
@@ -140,7 +151,7 @@ const LogIn: React.FC = () => {
 
       // Save credentials to cookies if "Remember Me" is checked
       if (formStates.rememberMe) {
-        setCookie("rememberedEmail", formStates.email, { maxAge: 60 * 60 * 24 * 30 }); // 30 days
+        setCookie("rememberedUsername", formStates.username, { maxAge: 60 * 60 * 24 * 30 }); // 30 days
         setCookie("rememberedPassword", formStates.password, { maxAge: 60 * 60 * 24 * 30 }); // 30 days
       }
 
@@ -153,17 +164,13 @@ const LogIn: React.FC = () => {
   };
 
   const logInHandler = () => {
-    const email = formStates.email.trim();
+    const username = formStates.username.trim();
     const password = formStates.password.trim();
-    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     let hasError = false;
 
-    if (!email) {
-      toast.error("Email is required");
-      hasError = true;
-    } else if (!isEmailValid.test(email)) {
-      toast.error("Invalid email address");
+    if (!username) {
+      toast.error("Username is required");
       hasError = true;
     }
 
@@ -181,7 +188,7 @@ const LogIn: React.FC = () => {
       loader: true,
     }));
 
-    const formDataClone = { email, password };
+    const formDataClone = { username, password };
 
     dispatch(logInUser(formDataClone))
       .unwrap()
@@ -219,13 +226,13 @@ const LogIn: React.FC = () => {
             </p>
             <div className="space-y-4">
               <div className="space-y-2 pb-2">
-                <Label htmlFor="email" className="text-sm text-black font-bold">
-                  Email
+                <Label htmlFor="username" className="text-sm text-black font-bold">
+                  Username
                 </Label>
                 <Input
-                  id="email"
-                  placeholder="Email"
-                  value={formStates.email}
+                  id="username"
+                  placeholder="Username"
+                  value={formStates.username}
                   onChange={handleInputChange}
                   className="text-sm text-gray p-5"
                 />

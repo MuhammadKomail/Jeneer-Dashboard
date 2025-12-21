@@ -18,9 +18,10 @@ interface HeaderProps {
   avatarUrl?: string;
   showBell?: boolean;
   offsetLeft?: number;
+  onLogout?: () => void;
 }
 
-export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false, offsetLeft = 80 }: HeaderProps) {
+export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false, offsetLeft = 80, onLogout }: HeaderProps) {
   const { t } = useTranslation();
   const pathname = usePathname()?.replace(/^\/+/, '') || '';
   const [menuOpen, setMenuOpen] = useState(false);
@@ -166,15 +167,17 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
                         </Link>
                       </div>
 
-                      <div className="border-t px-4 py-2">
+                      <div className="border-t">
                         <button
                           type="button"
-                          className="text-red-600 hover:text-red-700 text-sm"
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-gray-50"
                           onClick={() => {
-                            try {
-                              document.cookie = 'AuthToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-                            } catch (_) {}
-                            window.location.href = '/login';
+                            if (onLogout) {
+                              onLogout();
+                            } else {
+                              // Fallback: simple redirect if no handler provided
+                              window.location.href = '/admin/login';
+                            }
                           }}
                         >
                           Logout

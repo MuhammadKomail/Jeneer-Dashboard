@@ -44,6 +44,8 @@ import NavigineHeader from "@/components/navigine header/navigine header";
 import Overview from "@/components/dashboard/Overview";
 import HistoryPage from "@/components/dashboard/HistoryPage";
 import SettingsPage from "@/components/dashboard/SettingsPage";
+import { useSelector } from 'react-redux';
+import { deleteCookie } from 'cookies-next';
 
 const drawerWidth = 240;
 const drawerNarrowWidth = 80;
@@ -107,9 +109,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [selectedWell, setSelectedWell] = useState<string | null>(null);
-  const isDashboard = pathname === '/' || pathname.startsWith('/dashboard');
+  const isDashboard = pathname === '/' || pathname.startsWith('/dashboard') || pathname.startsWith('/admin/dashboard');
   const didInitDefaultRef = useRef(false);
   const searchParams = useSearchParams();
+  const authState: any = useSelector((state: any) => state.auth);
+  let lsUser: any = null;
+  let lsRole: string | null = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('user');
+      if (raw) lsUser = JSON.parse(raw);
+      lsRole = localStorage.getItem('role');
+    }
+  } catch {}
+  const headerUser = authState?.user?.user || authState?.user || lsUser || null;
+  const headerName = headerUser?.full_name || headerUser?.username || headerUser?.email || 'User';
+  const headerRole = authState?.user?.role || headerUser?.role || authState?.role || lsRole || 'User';
 
   // Initialize sidebar openness: desktop open, mobile collapsed
   useEffect(() => {
@@ -124,8 +139,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const hasAuthToken = document.cookie.split(';').some((cookie) => cookie.trim().startsWith('AuthToken='));
-    setIsAuthenticated(hasAuthToken);
+    const hasAuthToken = document.cookie.split(';').some((c) => c.trim().startsWith('AuthToken='));
+    const isUserAuthed = document.cookie.split(';').some((c) => c.trim().startsWith('UserAuthenticated='));
+    setIsAuthenticated(hasAuthToken && isUserAuthed);
     const timeout = setTimeout(() => setIsLoaded(true), 500);
     return () => clearTimeout(timeout);
   }, []);
@@ -142,16 +158,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     setOpen((prev) => !prev);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoggingOut(true);
-    setTimeout(() => {
-      document.cookie = 'AuthToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    try {
+      let sessionId: string | null = null;
+      try { sessionId = localStorage.getItem('sessionId'); } catch {}
+      try {
+        await fetch('/admin/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+          cache: 'no-store',
+        });
+      } catch {}
+    } finally {
+      // Clear auth cookies (ensure root path)
+      try {
+        deleteCookie('AuthToken', { path: '/' });
+        deleteCookie('RefreshToken', { path: '/' });
+        deleteCookie('user_object', { path: '/' });
+        deleteCookie('UserAuthenticated', { path: '/' });
+      } catch {}
+      // Clear client storage just in case
+      try { localStorage.clear(); } catch {}
+      try { sessionStorage.clear(); } catch {}
+
       setIsLoggingOut(false);
       setLogoutSuccess(true);
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1000);
-    }, 2000);
+      // Hard redirect to basePath login to avoid client routing cache
+      window.location.replace('/admin/login');
+    }
   };
 
   // Sites list used across Dashboard
@@ -183,6 +219,40 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDashboard]);
 
+  useEffect(() => {
+    if (!isDashboard) return;
+    if (!isAuthenticated) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/admin/api/auth/me', { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+        if (ignore) return;
+        if (res.ok && data) {
+          console.log('data: ', data);
+
+          // Also persist only the nested user object for direct access
+          try { if (data?.user) localStorage.setItem('user', JSON.stringify(data.user)); } catch { }
+
+          // Persist specific fields
+          try {
+            const role = data?.user?.role;
+            if (typeof role === 'string') {
+              localStorage.setItem('role', role);
+            }
+            if (Array.isArray(data?.allowed_tables)) {
+              localStorage.setItem('allowed_tables', JSON.stringify(data.allowed_tables));
+            }
+            if (Array.isArray(data?.allowed_routes)) {
+              localStorage.setItem('allowed_routes', JSON.stringify(data.allowed_routes));
+            }
+          } catch { }
+        }
+      } catch { }
+    })();
+    return () => { ignore = true; };
+  }, [isDashboard, isAuthenticated]);
+
   if (!isLoaded || isAuthenticated === null) {
     return null;
   }
@@ -194,6 +264,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navItems = [
     { text: 'Dashboard', href: '/dashboard', icon: <DashboardOutlinedIcon /> },
     { text: 'User Management', href: '/user-management', icon: <ManageAccountsOutlinedIcon /> },
+    { text: 'Role Management', href: '/roles', icon: <ManageAccountsOutlinedIcon /> },
     { text: 'Site Management', href: '/site-management', icon: <RoomOutlinedIcon /> },
     { text: 'Change Password', href: '/change-password', icon: <LockOutlinedIcon /> },
   ];
@@ -300,14 +371,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                               if (!expanded) setSelectedWell(null);
                             }}
                             sx={{
-                              margin: '4px 8px',
+                              width: '100%',
+                              cursor: 'pointer',
+                              m: 0,
+                              px: open ? 2 : 1,
+                              py: open ? 1 : 0.25,
                               borderRadius: '8px',
                               color: parentSelected ? '#0D542B' : 'rgba(255,255,255,0.95)',
                               backgroundColor: parentSelected ? '#DFF3D9' : 'transparent',
                               '&:hover': { backgroundColor: parentSelected ? '#DFF3D9' : 'rgba(255,255,255,0.08)' },
                               justifyContent: !open ? 'center' : 'flex-start',
-                              px: open ? 2 : 1,
-                              py: open ? 1 : 0.25,
                               fontWeight: parentSelected ? 600 : undefined,
                             }}
                           >
@@ -338,14 +411,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                                   <ListItemButton
                                     onClick={() => setSelectedWell(id)}
                                     sx={{
-                                      margin: '4px 8px',
+                                      width: '100%',
+                                      cursor: 'pointer',
+                                      m: 0,
+                                      px: open ? 2 : 1,
+                                      py: open ? 0.5 : 0.25,
                                       borderRadius: '8px',
                                       color: selected ? '#0D542B' : 'rgba(255,255,255,0.95)',
                                       backgroundColor: selected ? '#DFF3D9' : 'transparent',
                                       '&:hover': { backgroundColor: selected ? '#DFF3D9' : 'rgba(255,255,255,0.06)' },
                                       justifyContent: !open ? 'center' : 'flex-start',
-                                      px: open ? 2 : 1,
-                                      py: open ? 0.5 : 0.25,
                                     }}
                                   >
                                     {open ? (
@@ -372,7 +447,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <List>
                 {navItems.map((item, idx) => {
                   const selected = (item.href === '/dashboard' && (pathname === '/' || pathname === '/dashboard')) ||
-                                   (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                    (item.href !== '/dashboard' && pathname.startsWith(item.href));
                   return (
                     <ListItem key={item.text} disablePadding sx={{ px: open ? 1 : 0, py: 0.5 }}>
                       <ListItemButton
@@ -381,7 +456,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                         selected={selected}
                         onClick={() => setSelectedIdx(idx)}
                         sx={{
-                          margin: '4px 8px',
+                          width: '100%',
+                          cursor: 'pointer',
+                          m: 0,
                           borderRadius: '8px',
                           color: 'rgba(255,255,255,0.95)',
                           '&.Mui-selected': {
@@ -464,9 +541,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 variant="compact"
                 trail={trail}
                 showBell
-                userName="John Doe"
-                userRole="Admin"
+                userName={headerName}
+                userRole={headerRole}
                 offsetLeft={open ? drawerWidth : drawerNarrowWidth}
+                onLogout={() => setConfirmLogoutOpen(true)}
               />
             );
           })()}
@@ -494,6 +572,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Box>
         </Main>
       </Box>
+
+      {isLoggingOut && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            zIndex: (theme) => theme.zIndex.modal + 1,
+          }}
+          aria-label="Logging out"
+          role="status"
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CircularProgress size={48} sx={{ color: 'white' }} />
+            <Typography variant="body2" sx={{ color: 'white' }}>Logging out...</Typography>
+          </Box>
+        </Box>
+      )}
 
       <Dialog open={confirmLogoutOpen} onClose={() => setConfirmLogoutOpen(false)}>
         <DialogTitle>Log Out?</DialogTitle>

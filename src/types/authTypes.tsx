@@ -1,6 +1,6 @@
 // Represents the data needed for login
 export interface LoginData {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -16,13 +16,22 @@ export interface LoginResponse {
 
 // Represents the user data contained within the `data` field of the `AuthResponse`
 export interface UserDataResponse {
-  name: string;
-  email: string;
-  userId: string;
-  userType: string;
-  token: string;
-  refreshToken: string;
-  roleAndActions: RoleAndAction[];
+  // legacy fields (optional)
+  name?: string;
+  email?: string;
+  userId?: string;
+  userType?: string;
+  refreshToken?: string;
+  roleAndActions?: RoleAndAction[];
+
+  // new backend fields
+  success?: boolean;
+  sessionId?: string;
+  token?: string;
+  message?: string;
+  role?: string;
+  allowed_tables?: string[];
+  allowed_routes?: string[];
 }
 
 // Represents the role and actions assigned to the user
