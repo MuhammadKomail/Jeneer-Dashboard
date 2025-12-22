@@ -10,13 +10,6 @@ import {
   TextField,
   Typography,
   Chip,
-  IconButton,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableContainer,
   Toolbar,
   Dialog,
   DialogTitle,
@@ -26,6 +19,7 @@ import {
   Alert,
   Autocomplete
 } from '@mui/material';
+import DataTable, { Column } from '@/components/table/DataTable';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
@@ -83,6 +77,42 @@ const RolesPage: React.FC = () => {
     });
     return list;
   }, [roles, search, sortKey, sortAsc]);
+
+  const columns: Column<Role>[] = useMemo(() => ([
+    { key: 'name', header: 'Name' },
+    { key: 'id', header: 'ID' },
+    { key: 'description', header: 'Description', render: (r) => (
+      <span className="truncate inline-block max-w-[320px] align-middle">{r.description || ''}</span>
+    ) },
+    { key: 'allowed_tables', header: 'Allowed Tables', render: (r) => (
+      <div className="flex flex-wrap gap-1">
+        {r.allowed_tables?.map((t) => (
+          <span key={t} className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-800 border">{t}</span>
+        ))}
+      </div>
+    ) },
+    { key: 'allowed_routes', header: 'Allowed Routes', render: (r) => (
+      <div className="flex flex-wrap gap-1">
+        {r.allowed_routes?.map((rt) => (
+          <span key={rt} className="inline-flex items-center rounded-md bg-[#E7F3EB] px-2 py-0.5 text-xs text-[#0D542B] border border-[#CBE7D6]">{rt}</span>
+        ))}
+      </div>
+    ) },
+    { key: 'actions', header: 'Actions', className: 'text-right', cellClassName: 'text-right', render: (r) => (
+      <div className="inline-flex items-center gap-3">
+        <button className="text-[#0D542B]" title="Edit" aria-label="Edit" onClick={() => openEditDialog(r)}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
+          </svg>
+        </button>
+        <button className="text-red-600" title="Delete" aria-label="Delete" onClick={() => setOpenDelete(r.id)}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+            <path d="M6 7h12M9 7V5h6v2m-7 4v8m4-8v8m4-8v8M7 7l1 12m8-12-1 12" strokeWidth="1.5" />
+          </svg>
+        </button>
+      </div>
+    ) },
+  ]), []);
 
   // Minimal unauthorized handler (no external deps)
   const handleUnauthorized = () => {
@@ -198,82 +228,20 @@ const RolesPage: React.FC = () => {
         </Stack>
       </Toolbar>
 
-      <Paper sx={{ p: 0, m: 0, height: 'calc(100vh - 200px)', width: '100%', display: 'flex', flexDirection: 'column', borderRadius: 1, overflow: 'hidden' }}>
-        <TableContainer sx={{ flex: 1, height: '100%', width: '100%', overflowX: 'auto' }}>
-          <Table stickyHeader size="small" sx={{ minWidth: { xs: 760, sm: 960, md: 1200 }, width: '100%', tableLayout: 'fixed' }}>
-            <TableHead>
-              <TableRow>
-                {(['name', 'id', 'description'] as (keyof Role)[]).map((k, idx) => (
-                  <TableCell
-                    key={String(k)}
-                    onClick={() => { setSortKey(k); setSortAsc(k === sortKey ? !sortAsc : true); }}
-                    sx={{
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      width: k === 'name' ? { xs: '18%', md: '11%' } : k === 'id' ? { xs: '16%', md: '10%' } : { xs: '30%', md: '22%' },
-                      position: idx === 0 ? 'sticky' : 'static',
-                      left: idx === 0 ? 0 : 'auto',
-                      zIndex: idx === 0 ? 3 : 'auto',
-                      backgroundColor: 'background.paper',
-                    }}
-                    className={idx === 0 ? 'sticky-cell' : undefined}
-                  >
-                    <b>{String(k)}</b>{sortKey === k ? (sortAsc ? ' ▲' : ' ▼') : ''}
-                  </TableCell>
-                ))}
-                <TableCell sx={{ width: { xs: '34%', md: '30%' } }}><b>allowed_tables</b></TableCell>
-                <TableCell sx={{ width: { xs: '30%', md: '22%' } }}><b>allowed_routes</b></TableCell>
-                <TableCell align="right" sx={{ width: { xs: '10%', md: '5%' }, whiteSpace: 'nowrap' }}><b>Actions</b></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ py: 6 }}>
-                      <CircularProgress size={18} />
-                      <Typography variant="body2">Loading roles...</Typography>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ) : filteredSorted.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }} spacing={1}>
-                      <Typography variant="body1" sx={{ color: 'text.secondary' }}>No roles found</Typography>
-                      <Button variant="outlined" onClick={() => setOpenAdd(true)}>Add your first role</Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredSorted.map((r) => (
-                  <TableRow key={r.id} hover sx={{ '&:hover .sticky-cell': { backgroundColor: (theme) => theme.palette.action.hover } }}>
-                    <TableCell className="sticky-cell" sx={{ fontWeight: 600, width: { xs: '18%', md: '11%' }, position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'background.paper' }}>{r.name}</TableCell>
-                    <TableCell sx={{ color: 'text.secondary', width: { xs: '16%', md: '10%' } }}>{r.id}</TableCell>
-                    <TableCell sx={{ width: { xs: '30%', md: '22%' }, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{r.description}</TableCell>
-                    <TableCell sx={{ width: { xs: '34%', md: '30%' } }}>
-                      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                        {r.allowed_tables?.map(t => <Chip key={t} label={t} size="small" sx={{ height: 22, '& .MuiChip-label': { px: 0.75, fontSize: 12 } }} />)}
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ width: { xs: '30%', md: '22%' } }}>
-                      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                        {r.allowed_routes?.map(rt => <Chip key={rt} label={rt} size="small" color="success" variant="outlined" sx={{ height: 22, '& .MuiChip-label': { px: 0.75, fontSize: 12 } }} />)}
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="right" sx={{ width: { xs: '10%', md: '5%' } }}>
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <IconButton aria-label="Edit role" onClick={() => openEditDialog(r)} size="small"><EditOutlinedIcon fontSize="small" /></IconButton>
-                        <IconButton aria-label="Delete role" color="error" onClick={() => setOpenDelete(r.id)} size="small"><DeleteOutlineIcon fontSize="small" /></IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {error && <Box sx={{ p: 2 }}><Alert severity="error" onClose={() => setError(null)}>{error}</Alert></Box>}
+      <Paper sx={{ p: 2, m: 0 }}>
+        {loading ? (
+          <Box sx={{ py: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <CircularProgress size={18} />
+            <Typography variant="body2">Loading roles...</Typography>
+          </Box>
+        ) : (
+          <DataTable<Role>
+            columns={columns}
+            rows={filteredSorted}
+            pageSizeOptions={[10, 20, 50]}
+          />
+        )}
+        {error && <Box sx={{ mt: 2 }}><Alert severity="error" onClose={() => setError(null)}>{error}</Alert></Box>}
       </Paper>
 
       {/* Add Role Dialog */}
