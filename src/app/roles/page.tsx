@@ -220,13 +220,27 @@ const RolesPage: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-        <Typography variant="h5">Role Management</Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <TextField size="small" placeholder="Search roles" value={search} onChange={e => setSearch(e.target.value)} />
-          <Button variant="contained" onClick={() => setOpenAdd(true)}>Add Role</Button>
-        </Stack>
-      </Toolbar>
+      <div className="flex flex-wrap items-center gap-3 mb-3 w-full">
+        <div className="relative basis-full md:flex-1 md:min-w-[1000px]">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            className="w-full pl-9 pr-3 py-2.5 bg-white border rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3BA049]"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 ml-auto">
+          <button
+            onClick={() => setOpenAdd(true)}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm whitespace-nowrap"
+          >
+            Add Role
+            <span className="ml-1">+</span>
+          </button>
+        </div>
+      </div>
 
       <Paper sx={{ p: 2, m: 0 }}>
         {loading ? (
