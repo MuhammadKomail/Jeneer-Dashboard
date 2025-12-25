@@ -38,10 +38,13 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import Typography from '@mui/material/Typography';
-import { useEffect, useRef, useState } from 'react';
+import Skeleton from '@mui/material/Skeleton';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { assetPaths } from '@/paths/path';
 import NavigineHeader from "@/components/navigine header/navigine header";
 import Overview from "@/components/dashboard/Overview";
+import DeviceOverview from "@/components/dashboard/DeviceOverview";
+import GoogleMapView from "@/components/maps/GoogleMapView";
 import HistoryPage from "@/components/dashboard/HistoryPage";
 import SettingsPage from "@/components/dashboard/SettingsPage";
 import { useSelector } from 'react-redux';
@@ -109,6 +112,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [selectedWell, setSelectedWell] = useState<string | null>(null);
+  const [isSitesLoading, setIsSitesLoading] = useState<boolean>(false);
   const isDashboard = pathname === '/' || pathname.startsWith('/dashboard') || pathname.startsWith('/admin/dashboard');
   const didInitDefaultRef = useRef(false);
   const searchParams = useSearchParams();
@@ -190,39 +194,82 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     }
   };
 
-  // Sites list used across Dashboard
-  const dashboardSites: { site: string; wells: string[] }[] = [
-    { site: 'Broadhurst (Republic)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
-    { site: 'Chiquita Canyon (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348'] },
-    { site: 'Eagle Point (GFL)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322'] },
-    { site: 'Emerald Park (GFL)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Heart of Florida (WC)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Hickory Hill (WM)', wells: ['Wellfield Overview', 'LRI2306'] },
-    { site: 'Horror County', wells: ['Wellfield Overview'] },
-    { site: 'JED (WC)', wells: ['Wellfield Overview'] },
-    { site: 'LRI (WC)', wells: ['Wellfield Overview', 'LRI2306', 'LRI2322', 'LRI2348', 'LRI2363', 'LRI2439', 'LRI3786'] },
-  ];
+  // API data for companies -> sites -> devices
+  type Device = { id: number; device_serial: string };
+  type Site = { location_id: number; site_name: string; devices: Device[] };
+  type Company = { company_id: number; company_name: string; sites: Site[] };
+  const [apiCompanies, setApiCompanies] = useState<Company[] | null>(null);
+  const [apiLoadError, setApiLoadError] = useState<string | null>(null);
 
-  // Dashboard default selection: run only once per dashboard session
+  // Build sidebar items from API or fallback static data
+  const dashboardSites = useMemo(() => {
+    if (apiCompanies && apiCompanies.length) {
+      const groups: { site: string; wells: string[]; company_id: number }[] = [];
+      for (const comp of apiCompanies) {
+        for (const s of comp.sites || []) {
+          const label = `${s.site_name} (${comp.company_name})`;
+          const wells = [
+            'Wellfield Overview',
+            ...((s.devices || []).map((d) => d.device_serial).filter(Boolean)),
+          ];
+          groups.push({ site: label, wells, company_id: comp.company_id });
+        }
+      }
+      return groups;
+    }
+    // No fallback: keep empty until API returns
+    return [];
+  }, [apiCompanies]);
+
+  // Dashboard default selection: run once when we have data (API or fallback)
   useEffect(() => {
     if (!isDashboard) return;
     if (didInitDefaultRef.current) return;
-    const target = 'LRI (WC)';
-    const group = dashboardSites.find((g) => g.site === target);
+    if (!dashboardSites || dashboardSites.length === 0) return;
+    const firstGroup = dashboardSites[0];
+    const target = firstGroup?.site || 'LRI (WC)';
+    const wells = firstGroup?.wells || [];
     setExpandedSite(target);
-    const wells = group?.wells || [];
     const defaultWell = wells.includes('Wellfield Overview') ? 'Wellfield Overview' : wells[0];
     if (defaultWell) {
       setSelectedWell(`${target}__${defaultWell}`);
     }
     didInitDefaultRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDashboard]);
+  }, [isDashboard, dashboardSites]);
 
   useEffect(() => {
     if (!isDashboard) return;
     if (!isAuthenticated) return;
     let ignore = false;
+    // Fetch sidebar data
+    (async () => {
+      try {
+        setApiLoadError(null);
+        setIsSitesLoading(true);
+        const token = (() => {
+          try {
+            const match = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+          } catch { return null; }
+        })();
+        const res = await fetch('/admin/api/companies/all/sites-with-devices?includeEmpty=false', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: 'no-store',
+        });
+        const json = await res.json().catch(() => ({}));
+        if (ignore) return;
+        if (res.ok && Array.isArray(json?.data)) {
+          setApiCompanies(json.data as Company[]);
+        } else {
+          setApiLoadError('Failed to load sites');
+        }
+        setIsSitesLoading(false);
+      } catch (e) {
+        if (!ignore) setApiLoadError('Network error');
+        setIsSitesLoading(false);
+      }
+    })();
     (async () => {
       try {
         const res = await fetch('/admin/api/auth/me', { cache: 'no-store' });
@@ -354,6 +401,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {(() => {
             const isDashboard = pathname === '/' || pathname.startsWith('/dashboard');
             if (isDashboard) {
+              if (isSitesLoading && (!apiCompanies || apiCompanies.length === 0)) {
+                return (
+                  <List sx={{ px: open ? 1 : 0 }}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Box key={i} sx={{ px: open ? 1 : 0, py: 0.5 }}>
+                        <Skeleton variant="rounded" height={36} sx={{ bgcolor: 'rgba(255,255,255,0.25)' }} />
+                      </Box>
+                    ))}
+                  </List>
+                );
+              }
               return (
                 <List sx={{ color: 'rgba(255,255,255,0.95)' }}>
                   {dashboardSites.map((group) => {
@@ -563,10 +621,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               const well = selectedWell ? selectedWell.split('__')[1] : null;
               const view = searchParams?.get('view');
               if (!isDashboard) return children;
+              if (!well && isSitesLoading) {
+                return (
+                  <Box sx={{ display: 'grid', gap: 2 }}>
+                    <Skeleton variant="rounded" height={220} />
+                    <Skeleton variant="rounded" height={220} />
+                  </Box>
+                );
+              }
               if (view === 'history') return <HistoryPage />; // forced full-page history
               if (view === 'settings') return <SettingsPage />; // forced full-page settings
-              // For any selected well (including 'Wellfield Overview'), show the dashboard Overview
-              if (well) return <Overview />;
+              // Overview (Wellfield Overview) shows charts-only; individual wells show charts + tables
+              if (well) {
+                if (well === 'Wellfield Overview') {
+                  const group = dashboardSites.find(g => selectedWell?.startsWith(`${g.site}__`));
+                  const companyId = group?.company_id || 0;
+                  return <Overview companyId={companyId} />;
+                }
+                return <DeviceOverview />;
+              }
               return children;
             })()}
           </Box>

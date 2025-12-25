@@ -1,34 +1,99 @@
 import React from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
-import GallonsBarChart from './GallonsBarChart';
-import FocusMainPressureAreaChart from './FocusMainPressureAreaChart';
-import LiquidLevelAreaChart from './LiquidLevelAreaChart';
-import TemperatureLineChart from './TemperatureLineChart';
-import HistoryTable from './HistoryTable';
-import PumpSettingsTable from './PumpSettingsTable';
+import GallonsBarChart, { GallonsPoint } from './GallonsBarChart';
+import FocusMainPressureBarChart, { PressurePoint } from './FocusMainPressureBarChart';
+import LiquidLevelBarChart, { LiquidLevelPoint } from './LiquidLevelBarChart';
+import TemperatureBarChart, { TemperaturePoint } from './TemperatureBarChart';
+ 
+type Props = { companyId: number };
 
-const Overview: React.FC = () => {
+const Overview: React.FC<Props> = ({ companyId }) => {
+  const [gallons, setGallons] = React.useState<GallonsPoint[] | null>(null);
+  const [levels, setLevels] = React.useState<LiquidLevelPoint[] | null>(null);
+  const [temps, setTemps] = React.useState<TemperaturePoint[] | null>(null);
+  const [pressures, setPressures] = React.useState<PressurePoint[] | null>(null);
+  // Unified range filter across all charts
+  const [range, setRange] = React.useState<'1d' | '7d' | '1m' | '1y'>('1y');
+  const days = range === '1d' ? 1 : range === '7d' ? 7 : range === '1m' ? 30 : 365;
+
+  React.useEffect(() => {
+    let ignore = false;
+    const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
+    (async () => {
+      try {
+        const token = (() => {
+          try {
+            const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+            return m ? decodeURIComponent(m[1]) : null;
+          } catch { return null; }
+        })();
+        const url = `/admin/api/companies/${companyId}/overview?days=${days}&levelField=low_adc&pressureField=high_adc&temperatureField=cur_adc`;
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
+        const json = await res.json().catch(() => ({} as any));
+        if (ignore) return;
+        if (res.ok && json) {
+          const g: GallonsPoint[] = Array.isArray(json.gallons_pumped)
+            ? json.gallons_pumped.map((r: any) => ({ name: fmtDate(r.date), gallons: Number(r.value) || 0 }))
+            : [];
+          const l: LiquidLevelPoint[] = Array.isArray(json.liquid_level)
+            ? json.liquid_level.map((r: any) => ({ name: r.device_serial, level: Number(r.value) || 0 }))
+            : [];
+          const t: TemperaturePoint[] = Array.isArray(json.temperature_realtime)
+            ? json.temperature_realtime.map((r: any) => ({ name: r.device_serial, temp: Number(r.value) || 0 }))
+            : [];
+          const p: PressurePoint[] = Array.isArray(json.focus_main_pressure)
+            ? json.focus_main_pressure.map((r: any) => ({ name: r.device_serial, pressure: Number(r.value) || 0 }))
+            : [];
+          setGallons(g);
+          setLevels(l);
+          setTemps(t);
+          setPressures(p);
+        } else {
+          setGallons([]);
+          setLevels([]);
+          setTemps([]);
+          setPressures([]);
+        }
+      } catch {
+        if (!ignore) {
+          setGallons([]);
+          setLevels([]);
+          setTemps([]);
+          setPressures([]);
+        }
+      }
+    })();
+    return () => { ignore = true; };
+  }, [companyId, days]);
+
+  const controls = (
+    <select
+      value={range}
+      onChange={(e) => setRange(e.target.value as any)}
+      className="px-2 py-1 border rounded text-xs text-gray-700"
+    >
+      <option value="1d">Last 1 Day</option>
+      <option value="7d">Last 7 Days</option>
+      <option value="1m">Last 1 Month</option>
+      <option value="1y">Last 1 Year</option>
+    </select>
+  );
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
-          <GallonsBarChart />
+          <GallonsBarChart data={gallons || undefined} controls={controls} />
         </Grid>
         <Grid item xs={12} md={6}>
-          <FocusMainPressureAreaChart />
+          <LiquidLevelBarChart data={levels || undefined} controls={controls} />
         </Grid>
         <Grid item xs={12} md={6}>
-          <LiquidLevelAreaChart />
+          <TemperatureBarChart data={temps || undefined} controls={controls} />
         </Grid>
         <Grid item xs={12} md={6}>
-          <TemperatureLineChart />
-        </Grid>
-        <Grid item xs={12}>
-          <HistoryTable />
-        </Grid>
-        <Grid item xs={12}>
-          <PumpSettingsTable />
+          <FocusMainPressureBarChart data={pressures || undefined} controls={controls} />
         </Grid>
       </Grid>
     </Box>

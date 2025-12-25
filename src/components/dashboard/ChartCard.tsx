@@ -9,9 +9,10 @@ interface ChartCardProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  rightControls?: React.ReactNode;
 }
 
-const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, children }) => {
+const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, children, rightControls }) => {
   return (
     <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #EAECF0' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -21,9 +22,12 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, children }) => {
             <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
           )}
         </Box>
-        <IconButton size="small">
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {rightControls}
+          <IconButton size="small">
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Box>
       </Box>
       <Box sx={{ width: '100%', height: 260 }}>
         {children}
