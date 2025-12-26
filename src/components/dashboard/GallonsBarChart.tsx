@@ -4,23 +4,19 @@ import ChartCard from './ChartCard';
 
 export type GallonsPoint = { name: string; gallons: number };
 
-const fallbackData: GallonsPoint[] = Array.from({ length: 8 }).map((_, i) => ({
-  name: `LRI230${i + 1}`,
-  gallons: [320, 200, 540, 460, 610, 380, 420, 360][i],
-}));
-
 const GallonsBarChart: React.FC<{ data?: GallonsPoint[]; title?: string; controls?: React.ReactNode }> = ({ data, title = 'Gallons Pumped', controls }) => {
-  const defaultControls = (
-    <select className="px-2 py-1 border rounded text-xs text-gray-700">
-      <option>Last 7 Days</option>
-      <option>Last 24 Hours</option>
-      <option>Last 1 Month</option>
-    </select>
-  );
+  if (!data || data.length === 0) {
+    return (
+      <ChartCard title={title} subtitle="" rightControls={controls}>
+        <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
+      </ChartCard>
+    );
+  }
+
   return (
-    <ChartCard title={title} subtitle="" rightControls={controls ?? defaultControls}>
+    <ChartCard title={title} subtitle="" rightControls={controls}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data && data.length ? data : fallbackData}>
+        <BarChart data={data}>
           <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip />
