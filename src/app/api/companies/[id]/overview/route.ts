@@ -5,14 +5,14 @@ const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:301';
 
 export async function GET(
   req: NextRequest,
-  ctx: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get('AuthToken')?.value;
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const params = await Promise.resolve((ctx as any).params);
-    const id = params?.id;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     if (!id) return NextResponse.json({ error: 'Missing company id' }, { status: 400 });
 
     const url = new URL(req.url);

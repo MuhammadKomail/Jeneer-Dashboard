@@ -5,14 +5,14 @@ const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:301';
 
 export async function DELETE(
   req: NextRequest,
-  ctx: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get('AuthToken')?.value;
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const params = await Promise.resolve((ctx as any).params);
-    const id = params?.id;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     const res = await axios.delete(`${baseURL}/admin/api/roles/${encodeURIComponent(id)}`, {
       headers: { Authorization: `Bearer ${token}` },
       validateStatus: () => true,
@@ -36,14 +36,14 @@ export async function DELETE(
 
 export async function PUT(
   req: NextRequest,
-  ctx: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.cookies.get('AuthToken')?.value;
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const params = await Promise.resolve((ctx as any).params);
-    const id = params?.id;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     const body = await req.json().catch(() => ({}));
     const res = await axios.put(`${baseURL}/admin/api/roles/${encodeURIComponent(id)}`, body, {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
