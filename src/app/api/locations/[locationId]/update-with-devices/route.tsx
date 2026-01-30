@@ -3,12 +3,16 @@ import axios from "axios";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:301";
 
-export async function PATCH(req: NextRequest, ctx: { params: { locationId: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ locationId: string }> }
+) {
   try {
     const token = req.cookies.get("AuthToken")?.value;
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const locationId = ctx?.params?.locationId;
+    const resolved = await params;
+    const locationId = resolved?.locationId;
     if (!locationId) return NextResponse.json({ error: "Missing locationId" }, { status: 400 });
 
     const body = await req.json().catch(() => ({}));
