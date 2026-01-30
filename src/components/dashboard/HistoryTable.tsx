@@ -1,4 +1,5 @@
 import React from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
 import DataTable, { Column } from '@/components/table/DataTable';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -13,7 +14,7 @@ type HistoryRow = {
   battery: number;
 };
 
-const rows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
+const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
   ts: `2025-06-1${i} 08:06:40`,
   gallons: 2800 + (i % 7) * 15,
   cycle: 4000,
@@ -35,10 +36,35 @@ const columns: Column<HistoryRow>[] = [
   { key: 'battery', header: 'Battery Voltage', render: (r) => r.battery.toFixed(1) },
 ];
 
-const HistoryTable: React.FC = () => {
+const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
   const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('7d');
   const router = useRouter();
   const pathname = usePathname();
+  const [rows, setRows] = React.useState<HistoryRow[] | null>(null);
+  const [total, setTotal] = React.useState<number>(0);
+  const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+
+  React.useEffect(() => {
+    let ignore = false;
+    if (!deviceSerial) { setRows(fallbackRows); setTotal(fallbackRows.length); return; }
+    (async () => {
+      try {
+        const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
+        const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/history?range=${range}&page=${page}&pageSize=${pageSize}`;
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
+        const json = await res.json().catch(() => ({} as any));
+        if (ignore) return;
+        if (res.ok && Array.isArray(json?.rows)) {
+          setRows(json.rows as HistoryRow[]);
+          setTotal(Number(json.total) || (json.rows as any[]).length);
+        } else {
+          setRows([]); setTotal(0);
+        }
+      } catch { if (!ignore) { setRows([]); setTotal(0); } }
+    })();
+    return () => { ignore = true; };
+  }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
     const header = ['Timestamp','Gallons','Cycle','Timeouts','Total Gallons','Total Cycles','Total Timeouts','Battery Voltage'];
@@ -92,7 +118,22 @@ const HistoryTable: React.FC = () => {
           </button>
         </div>
       </div>
-      <DataTable<HistoryRow> columns={columns} rows={rows} pageSizeOptions={[10, 20, 50]} />
+      {rows === null ? (
+        <div className="fixed inset-0 z-40 bg-white/60 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
+        </div>
+      ) : (
+      <DataTable<HistoryRow>
+        columns={columns}
+        rows={rows || []}
+        pageSizeOptions={[10, 20, 50]}
+        total={total}
+        page={page}
+        onPageChange={(p)=>setPage(p)}
+        pageSize={pageSize}
+        onPageSizeChange={(s)=>{ setPageSize(s); setPage(1); }}
+      />
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import DataTable, { Column } from '@/components/table/DataTable';
+import CircularProgress from '@mui/material/CircularProgress';
 import { usePathname, useRouter } from 'next/navigation';
 
 type SettingRow = {
@@ -13,7 +14,7 @@ type SettingRow = {
   delay: number;
 };
 
-const rows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
+const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   ts: `2025-06-1${i} 08:06:40`,
   highAdc: 2800 + i,
   threshold: 4000,
@@ -35,14 +36,37 @@ const columns: Column<SettingRow>[] = [
   { key: 'delay', header: 'Delay' },
 ];
 
-const PumpSettingsTable: React.FC = () => {
+const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
   const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('7d');
   const router = useRouter();
   const pathname = usePathname();
+  const [rows, setRows] = React.useState<SettingRow[] | null>(null);
+  const [total, setTotal] = React.useState<number>(0);
+  const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+
+  React.useEffect(() => {
+    let ignore = false;
+    if (!deviceSerial) { setRows(fallbackRows); setTotal(fallbackRows.length); return; }
+    (async () => {
+      try {
+        const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
+        const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings?range=${range}&page=${page}&pageSize=${pageSize}`;
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
+        const json = await res.json().catch(() => ({} as any));
+        if (ignore) return;
+        if (res.ok && Array.isArray(json?.rows)) {
+          setRows(json.rows as SettingRow[]);
+          setTotal(Number(json.total) || (json.rows as any[]).length);
+        } else { setRows([]); setTotal(0); }
+      } catch { if (!ignore) { setRows([]); setTotal(0); } }
+    })();
+    return () => { ignore = true; };
+  }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
     const header = ['Timestamp','High ADC Reading','ADC Threshold Setting','Current ADC','Low ADC Reading','Air On Time','Air Flow Timeout','Delay'];
-    const lines = rows.map(r => [r.ts, r.highAdc, r.threshold, r.currentAdc, r.lowAdc, r.airOnTime, r.airTimeout, r.delay].join(','));
+    const lines = (rows || fallbackRows).map(r => [r.ts, r.highAdc, r.threshold, r.currentAdc, r.lowAdc, r.airOnTime, r.airTimeout, r.delay].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -92,7 +116,22 @@ const PumpSettingsTable: React.FC = () => {
           </button>
         </div>
       </div>
-      <DataTable<SettingRow> columns={columns} rows={rows} pageSizeOptions={[10, 20, 50]} />
+      {rows === null ? (
+        <div className="w-full h-40 grid place-items-center">
+          <CircularProgress color="success" size={28} />
+        </div>
+      ) : (
+        <DataTable<SettingRow>
+          columns={columns}
+          rows={rows || []}
+          pageSizeOptions={[10, 20, 50]}
+          total={total}
+          page={page}
+          onPageChange={(p)=>setPage(p)}
+          pageSize={pageSize}
+          onPageSizeChange={(s)=>{ setPageSize(s); setPage(1); }}
+        />
+      )}
     </div>
   );
 };

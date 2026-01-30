@@ -76,6 +76,16 @@ const Overview: React.FC<Props> = ({ companyId }) => {
     return () => { ignore = true; };
   }, [companyId, days]);
 
+  const loading = gallons === null || levels === null || temps === null || pressures === null;
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-40 bg-white/60 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
+      </div>
+    );
+  }
+
   const controls = (
     <select
       value={range}

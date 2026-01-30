@@ -195,11 +195,51 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   // API data for companies -> sites -> devices
-  type Device = { id: number; device_serial: string };
+  type Device = { id: number; device_serial: string; geolocation?: { x: number; y: number } | [number, number] | null };
   type Site = { location_id: number; site_name: string; devices: Device[] };
   type Company = { company_id: number; company_name: string; sites: Site[] };
   const [apiCompanies, setApiCompanies] = useState<Company[] | null>(null);
   const [apiLoadError, setApiLoadError] = useState<string | null>(null);
+
+  // Build map markers for the currently expanded site (parent clicked)
+  type MapMarker = {
+    id: string;
+    position: { lat: number; lng: number };
+    label?: string;
+    color?: 'red' | 'orange' | 'green';
+  };
+
+  const siteMarkers = useMemo<MapMarker[]>(() => {
+    if (!expandedSite || !apiCompanies) return [];
+    // expandedSite label format: `${site_name} (${company_name})`
+    const m = expandedSite.match(/^(.+?) \((.+)\)$/);
+    const siteName = m ? m[1] : expandedSite;
+    const companyName = m ? m[2] : '';
+    const company = apiCompanies.find(c => c.company_name === companyName) || null;
+    const site = company?.sites?.find(s => s.site_name === siteName) || null;
+    if (!site) return [];
+    return (site.devices || [])
+      .map((d) => {
+        const g = d.geolocation as any;
+        let lng: number | null = null;
+        let lat: number | null = null;
+        if (Array.isArray(g) && g.length >= 2) {
+          lng = typeof g[0] === 'number' ? g[0] : null;
+          lat = typeof g[1] === 'number' ? g[1] : null;
+        } else if (g && typeof g === 'object') {
+          lng = typeof g.x === 'number' ? g.x : null;
+          lat = typeof g.y === 'number' ? g.y : null;
+        }
+        if (lng == null || lat == null) return null;
+        return {
+          id: String(d.id || d.device_serial || Math.random()),
+          label: d.device_serial,
+          position: { lat, lng },
+          color: 'green' as const,
+        };
+      })
+      .filter(Boolean) as MapMarker[];
+  }, [expandedSite, apiCompanies]);
 
   // Build sidebar items from API or fallback static data
   const dashboardSites = useMemo(() => {
@@ -228,12 +268,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     if (!dashboardSites || dashboardSites.length === 0) return;
     const firstGroup = dashboardSites[0];
     const target = firstGroup?.site || 'LRI (WC)';
-    const wells = firstGroup?.wells || [];
     setExpandedSite(target);
-    const defaultWell = wells.includes('Wellfield Overview') ? 'Wellfield Overview' : wells[0];
-    if (defaultWell) {
-      setSelectedWell(`${target}__${defaultWell}`);
-    }
+    // Do NOT select a specific well by default so that the map view shows first
+    setSelectedWell(null);
     didInitDefaultRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDashboard, dashboardSites]);
@@ -461,9 +498,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                             {group.wells.map((well) => {
                               const id = `${group.site}__${well}`;
                               const selected = selectedWell === id;
-                              const compactLabel = well.startsWith('LRI')
-                                ? well
-                                : `${group.site.split(' ')[0]} ${well}`;
+                              const compactLabel = well;
                               return (
                                 <ListItem key={id} disablePadding sx={{ px: open ? 2 : 0, py: open ? 0.25 : 0.125 }}>
                                   <ListItemButton
@@ -638,7 +673,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   const companyId = group?.company_id || 0;
                   return <Overview companyId={companyId} />;
                 }
-                return <DeviceOverview />;
+                return <DeviceOverview deviceSerial={well} />;
+              }
+              // Parent site clicked (no specific well selected): show map with all devices for that site
+              if (expandedSite) {
+                // Compute a reasonable center from markers
+                const center = (() => {
+                  if (!siteMarkers.length) return { lat: 34.0522, lng: -118.2437 };
+                  const sum = siteMarkers.reduce((acc, m) => ({ lat: acc.lat + m.position.lat, lng: acc.lng + m.position.lng }), { lat: 0, lng: 0 });
+                  return { lat: sum.lat / siteMarkers.length, lng: sum.lng / siteMarkers.length };
+                })();
+                return (
+                  <GoogleMapView
+                    center={center}
+                    zoom={12}
+                    markers={siteMarkers}
+                    fullScreen
+                    anchorSelector=".MuiDrawer-paper"
+                    headerSelector="header.fixed, [data-app-header]"
+                    zIndex={100}
+                  />
+                );
               }
               return children;
             })()}

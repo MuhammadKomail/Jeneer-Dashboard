@@ -424,14 +424,7 @@ export default function SiteManagementPage() {
 
   return (
     <div className="w-full">
-      {apiLoadingCount > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-lg flex items-center gap-3">
-            <div className="h-5 w-5 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
-            <div className="text-sm text-gray-700">Loading...</div>
-          </div>
-        </div>
-      )}
+      
       {/* Toolbar: single responsive row */}
       <div className="flex flex-wrap items-center gap-3 mb-3 w-full">
         <div className="relative basis-full md:flex-1 md:min-w-[1000px]">
@@ -487,7 +480,7 @@ export default function SiteManagementPage() {
       />
 
       <Dialog open={addOpen} onOpenChange={(o) => !siteBusy && setAddOpen(o)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl relative">
           <DialogHeader>
             <DialogTitle>Add Site</DialogTitle>
           </DialogHeader>
@@ -587,11 +580,16 @@ export default function SiteManagementPage() {
               {siteBusy ? "Saving..." : "Add Site"}
             </button>
           </DialogFooter>
+          {siteBusy && (
+            <div className="absolute inset-0 z-50 bg-white/60 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={companyOpen} onOpenChange={(o) => !companyBusy && setCompanyOpen(o)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl relative">
           <DialogHeader>
             <DialogTitle>Add Company</DialogTitle>
           </DialogHeader>
@@ -628,11 +626,16 @@ export default function SiteManagementPage() {
               {companyBusy ? "Saving..." : "Add Company"}
             </button>
           </DialogFooter>
+          {companyBusy && (
+            <div className="absolute inset-0 z-50 bg-white/60 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={(o) => !editBusy && setEditOpen(o)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl relative">
           <DialogHeader>
             <DialogTitle>Edit Site</DialogTitle>
           </DialogHeader>
@@ -773,6 +776,11 @@ export default function SiteManagementPage() {
               {editBusy ? "Saving..." : "Update Site"}
             </button>
           </DialogFooter>
+          {editBusy && (
+            <div className="absolute inset-0 z-50 bg-white/60 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

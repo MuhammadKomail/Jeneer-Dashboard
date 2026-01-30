@@ -203,8 +203,8 @@ const LogIn: React.FC = () => {
   return (
     <div className={styles.authMainContainer}>
       <div className="min-h-screen md:flex bg-white">
-        <div className="hidden md:block relative md:min-h-screen md:basis-1/2 overflow-hidden">
-          <Image src={leftImage} alt="left-image" fill priority sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+        <div className="hidden md:block relative md:min-h-screen md:basis-1/2 overflow-hidden rounded-r-[24px]">
+          <Image src={leftImage} alt="left-image" fill priority sizes="(min-width: 768px) 50vw, 100vw" className="object-cover object-left-top" />
         </div>
         <div className="flex-1 flex items-center justify-center p-8 sm:p-12 bg-white md:rounded-r-[3px] shadow-xl">
           <div className="w-full max-w-lg">

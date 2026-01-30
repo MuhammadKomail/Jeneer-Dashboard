@@ -16,7 +16,17 @@ const TemperatureBarChart: React.FC<{ data?: TemperaturePoint[]; controls?: Reac
     <ChartCard title="Temperature (Real-time)" subtitle="" rightControls={controls}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+            tickFormatter={(v: any) => {
+              const d = new Date(String(v));
+              return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+            }}
+          />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip />
           <Bar dataKey="temp" fill="#9AC40C" radius={[6, 6, 0, 0]} />
