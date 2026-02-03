@@ -691,7 +691,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     fullScreen
                     anchorSelector=".MuiDrawer-paper"
                     headerSelector="header.fixed, [data-app-header]"
-                    zIndex={100}
+                    zIndex={10}
                   />
                 );
               }
