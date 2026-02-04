@@ -296,6 +296,7 @@ export default function UserManagementPage() {
         className: "text-right",
         cellClassName: "text-right",
         render: (row) => (
+          String(row.username || "").toLowerCase() === "admin" ? null : (
           <div className="inline-flex items-center gap-3">
             <button
               className="text-[#0D542B]"
@@ -338,6 +339,7 @@ export default function UserManagementPage() {
               </svg>
             </button>
           </div>
+          )
         ),
       },
     ]

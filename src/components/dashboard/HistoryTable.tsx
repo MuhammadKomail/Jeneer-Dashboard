@@ -86,7 +86,7 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
         <div className="flex items-center gap-2">
           <select
             value={range}
-            onChange={(e)=>setRange(e.target.value as any)}
+            onChange={(e)=>{ setRange(e.target.value as any); setPage(1); }}
             className="px-3 py-1.5 bg-white border rounded-md text-sm text-gray-700"
           >
             <option value="24h">Last 24 Hours</option>

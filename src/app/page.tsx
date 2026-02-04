@@ -207,6 +207,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     position: { lat: number; lng: number };
     label?: string;
     color?: 'red' | 'orange' | 'green';
+    info?: React.ReactNode;
   };
 
   const siteMarkers = useMemo<MapMarker[]>(() => {
@@ -218,6 +219,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const company = apiCompanies.find(c => c.company_name === companyName) || null;
     const site = company?.sites?.find(s => s.site_name === siteName) || null;
     if (!site) return [];
+
+    const metrics = (site as any)?.metrics as any;
+    const pumped24 = typeof metrics?.pumped_last_24h_gal === 'number' ? metrics.pumped_last_24h_gal : null;
+    const timeouts24 = typeof metrics?.timeouts_last_24h === 'number' ? metrics.timeouts_last_24h : null;
+    const tempF = typeof metrics?.temperature_f === 'number' ? metrics.temperature_f : null;
+    const vacuum = typeof metrics?.vacuum_inwc === 'number' ? metrics.vacuum_inwc : null;
+
+    const detailsNode = (
+      <div style={{ minWidth: 220 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6, color: '#2f6b2f' }}>{(site as any)?.site_name || 'Site'}</div>
+        <div style={{ fontSize: 13, color: '#111827', lineHeight: 1.6 }}>
+          <div>Pumped Last 24 Hours: {pumped24 == null ? '-' : pumped24.toLocaleString()} gal</div>
+          <div>Timeouts Last 24 Hours: {timeouts24 == null ? '-' : timeouts24.toLocaleString()}</div>
+          <div>Temperature: {tempF == null ? '-' : tempF} F</div>
+          <div>Vacuum: {vacuum == null ? '-' : vacuum} inwc</div>
+        </div>
+      </div>
+    );
+
     return (site.devices || [])
       .map((d) => {
         const g = d.geolocation as any;
@@ -236,6 +256,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           label: d.device_serial,
           position: { lat, lng },
           color: 'green' as const,
+          info: detailsNode,
         };
       })
       .filter(Boolean) as MapMarker[];

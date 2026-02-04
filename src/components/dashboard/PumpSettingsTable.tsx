@@ -2,8 +2,10 @@ import React from 'react';
 import DataTable, { Column } from '@/components/table/DataTable';
 import CircularProgress from '@mui/material/CircularProgress';
 import { usePathname, useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 type SettingRow = {
+  id: string;
   ts: string;
   highAdc: number;
   threshold: number;
@@ -15,6 +17,7 @@ type SettingRow = {
 };
 
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
+  id: String(i + 1),
   ts: `2025-06-1${i} 08:06:40`,
   highAdc: 2800 + i,
   threshold: 4000,
@@ -25,17 +28,6 @@ const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   delay: 5,
 }));
 
-const columns: Column<SettingRow>[] = [
-  { key: 'ts', header: 'Timestamp' },
-  { key: 'highAdc', header: 'High ADC Reading' },
-  { key: 'threshold', header: 'ADC Threshold Setting' },
-  { key: 'currentAdc', header: 'Current ADC' },
-  { key: 'lowAdc', header: 'Low ADC Reading' },
-  { key: 'airOnTime', header: 'Air On Time' },
-  { key: 'airTimeout', header: 'Air Flow Timeout' },
-  { key: 'delay', header: 'Delay' },
-];
-
 const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
   const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('7d');
   const router = useRouter();
@@ -44,6 +36,144 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   const [total, setTotal] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
+  const [editing, setEditing] = React.useState<{ rowId: string; field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay'; value: string } | null>(null);
+  const [saving, setSaving] = React.useState(false);
+
+  const normalizeRows = React.useCallback((raw: any[]): SettingRow[] => {
+    return raw.map((r: any, idx: number) => {
+      const id = String(r?.id ?? r?.setting_id ?? r?.settingId ?? r?.settings_id ?? r?.ts ?? r?.timestamp ?? idx);
+      const ts = String(r?.ts ?? r?.timestamp ?? r?.created_at ?? '');
+      const highAdc = Number(r?.highAdc ?? r?.high_adc ?? r?.high_adc_reading ?? r?.high_adc_value ?? 0) || 0;
+      const threshold = Number(r?.threshold ?? r?.adc_threshold ?? r?.adcThreshold ?? 0) || 0;
+      const currentAdc = Number(r?.currentAdc ?? r?.current_adc ?? r?.current_adc_reading ?? 0) || 0;
+      const lowAdc = Number(r?.lowAdc ?? r?.low_adc ?? r?.low_adc_reading ?? r?.low_adc_value ?? 0) || 0;
+      const airOnTime = Number(r?.airOnTime ?? r?.air_on_time ?? r?.air_on ?? 0) || 0;
+      const airTimeout = Number(r?.airTimeout ?? r?.air_timeout ?? r?.air_flow_timeout ?? 0) || 0;
+      const delay = Number(r?.delay ?? r?.start_delay ?? 0) || 0;
+      return { id, ts, highAdc, threshold, currentAdc, lowAdc, airOnTime, airTimeout, delay };
+    });
+  }, []);
+
+  const startEdit = (row: SettingRow, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
+    setEditing({ rowId: row.id, field, value: String(row[field] ?? '') });
+  };
+
+  const saveEdit = async () => {
+    if (!editing || !deviceSerial) return;
+    const nextVal = Number(editing.value);
+    if (!Number.isFinite(nextVal)) {
+      toast.error('Invalid number');
+      return;
+    }
+
+    const current = (rows || []).find(r => r.id === editing.rowId);
+    if (!current) {
+      toast.error('Row not found');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
+      const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings/${encodeURIComponent(editing.rowId)}`;
+      const body = {
+        threshold: editing.field === 'threshold' ? nextVal : current.threshold,
+        airOnTime: editing.field === 'airOnTime' ? nextVal : current.airOnTime,
+        airTimeout: editing.field === 'airTimeout' ? nextVal : current.airTimeout,
+        delay: editing.field === 'delay' ? nextVal : current.delay,
+      };
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.error || json?.message || 'Failed to update settings');
+      }
+
+      setRows((prev) => {
+        if (!prev) return prev;
+        return prev.map(r => r.id === editing.rowId ? { ...r, ...body } : r);
+      });
+      toast.success('Settings updated');
+      setEditing(null);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderEditable = (row: SettingRow, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
+    const isActive = editing?.rowId === row.id && editing?.field === field;
+    if (!isActive) {
+      return (
+        <div className="inline-flex items-center gap-2">
+          <span>{row[field]}</span>
+          <button
+            type="button"
+            className="text-[#0D542B] disabled:opacity-50"
+            onClick={() => startEdit(row, field)}
+            disabled={saving}
+            aria-label={`Edit ${field}`}
+            title="Edit"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
+            </svg>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="inline-flex items-center gap-2">
+        <input
+          type="number"
+          value={editing?.value ?? ''}
+          onChange={(e) => setEditing((p) => p ? { ...p, value: e.target.value } : p)}
+          className="w-24 px-2 py-1 border rounded"
+          disabled={saving}
+        />
+        <button
+          type="button"
+          className="px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
+          onClick={saveEdit}
+          disabled={saving}
+          title="Save"
+          aria-label="Save"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          className="px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
+          onClick={() => setEditing(null)}
+          disabled={saving}
+          title="Cancel"
+          aria-label="Cancel"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  };
+
+  const columns: Column<SettingRow>[] = React.useMemo(() => [
+    { key: 'ts', header: 'Timestamp' },
+    { key: 'highAdc', header: 'High ADC Reading' },
+    { key: 'threshold', header: 'ADC Threshold Setting', render: (row) => renderEditable(row, 'threshold') },
+    { key: 'currentAdc', header: 'Current ADC' },
+    { key: 'lowAdc', header: 'Low ADC Reading' },
+    { key: 'airOnTime', header: 'Air On Time', render: (row) => renderEditable(row, 'airOnTime') },
+    { key: 'airTimeout', header: 'Air Flow Timeout', render: (row) => renderEditable(row, 'airTimeout') },
+    { key: 'delay', header: 'Delay', render: (row) => renderEditable(row, 'delay') },
+  ], [renderEditable, saving, editing]);
 
   React.useEffect(() => {
     let ignore = false;
@@ -56,13 +186,14 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && Array.isArray(json?.rows)) {
-          setRows(json.rows as SettingRow[]);
-          setTotal(Number(json.total) || (json.rows as any[]).length);
+          const normalized = normalizeRows(json.rows as any[]);
+          setRows(normalized);
+          setTotal(Number(json.total) || normalized.length);
         } else { setRows([]); setTotal(0); }
       } catch { if (!ignore) { setRows([]); setTotal(0); } }
     })();
     return () => { ignore = true; };
-  }, [deviceSerial, range, page, pageSize]);
+  }, [deviceSerial, range, page, pageSize, normalizeRows]);
 
   const exportCsv = () => {
     const header = ['Timestamp','High ADC Reading','ADC Threshold Setting','Current ADC','Low ADC Reading','Air On Time','Air Flow Timeout','Delay'];

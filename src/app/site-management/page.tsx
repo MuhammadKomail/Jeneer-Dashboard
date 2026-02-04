@@ -315,7 +315,16 @@ export default function SiteManagementPage() {
       const res = await fetch('/admin/api/companies?page=1&pageSize=200&sort=name&order=asc', { cache: 'no-store' });
       const data: CompaniesResponse = await res.json().catch(() => ({} as any));
       if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to fetch companies');
-      setCompanies(Array.isArray(data?.data) ? data.data : []);
+      const raw = Array.isArray(data?.data) ? (data.data as any[]) : [];
+      const normalized: Company[] = raw
+        .map((c) => {
+          const id = Number((c as any)?.id ?? (c as any)?.company_id);
+          const name = String((c as any)?.name ?? (c as any)?.company_name ?? '').trim();
+          if (!Number.isFinite(id) || !name) return null;
+          return { id, name };
+        })
+        .filter(Boolean) as Company[];
+      setCompanies(normalized);
     } catch {
       setCompanies([]);
     } finally {

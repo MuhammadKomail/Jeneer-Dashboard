@@ -16,13 +16,13 @@ export async function GET(
     if (!serial) return NextResponse.json({ error: 'Missing device serial' }, { status: 400 });
 
     const url = new URL(req.url);
-    const range = url.searchParams.get('range') ?? '7d';
+    const range = url.searchParams.get('range');
     const page = url.searchParams.get('page') ?? '1';
     const pageSize = url.searchParams.get('pageSize') ?? '10';
 
     const upstream = `${baseURL}/admin/api/devices/${encodeURIComponent(serial)}/history`;
     const res = await axios.get(upstream, {
-      params: { range, page, pageSize },
+      params: { ...(range ? { range } : {}), page, pageSize },
       headers: { Authorization: `Bearer ${token}` },
       validateStatus: () => true,
     });
