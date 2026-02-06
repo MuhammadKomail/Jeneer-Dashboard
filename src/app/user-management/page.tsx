@@ -109,6 +109,48 @@ export default function UserManagementPage() {
   const [siteI, setSiteI] = useState("");
   const [passwordI, setPasswordI] = useState("");
 
+  const [allowedRoutes, setAllowedRoutes] = useState<string[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const readPerms = () => {
+      try {
+        const raw = localStorage.getItem('allowed_routes');
+        const parsed = raw ? JSON.parse(raw) : null;
+        setAllowedRoutes(Array.isArray(parsed) ? parsed.map((x) => String(x)) : []);
+      } catch {
+        setAllowedRoutes([]);
+      }
+      try {
+        setUserRole(localStorage.getItem('role'));
+      } catch {
+        setUserRole(null);
+      }
+    };
+    if (typeof window === 'undefined') return;
+    readPerms();
+    const onPermUpdate = () => readPerms();
+    window.addEventListener('permissions_updated', onPermUpdate as any);
+    return () => window.removeEventListener('permissions_updated', onPermUpdate as any);
+  }, []);
+
+  const isSuperAdmin = useMemo(() => {
+    const r = String(userRole || '').trim().toLowerCase();
+    return r === 'admin' || r === 'system administrator' || r === 'system admin' || r === 'super admin';
+  }, [userRole]);
+
+  const can = useMemo(() => {
+    return (key: string) => {
+      if (isSuperAdmin) return true;
+      if (!key) return true;
+      return allowedRoutes.includes(key);
+    };
+  }, [allowedRoutes, isSuperAdmin]);
+
+  const canCreateUser = can('users:create');
+  const canEditUser = can('users:edit');
+  const canDeleteUser = canEditUser;
+
   // Minimal unauthorized handler (no external deps)
   const handleUnauthorized = () => {
     try {
@@ -298,52 +340,62 @@ export default function UserManagementPage() {
         render: (row) => (
           String(row.username || "").toLowerCase() === "admin" ? null : (
           <div className="inline-flex items-center gap-3">
-            <button
-              className="text-[#0D542B]"
-              title="Edit"
-              aria-label="Edit"
-              onClick={() => {
-                setEditUserId(row.id);
-                setUsernameI(row.username);
-                const parts = String(row.fullName || "").split(" ");
-                setFirstNameI(parts[0] || "");
-                setLastNameI(parts.slice(1).join(" "));
-                setEmailI(row.email);
-                setRoleI(row.role);
-                setSiteI(row.siteName);
-                setPasswordI("");
-                setEditOpen(true);
-                setSuccess(null);
-                setError(null);
-              }}
-              disabled={busy}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
-              </svg>
-            </button>
-            <button
-              className="text-red-600"
-              title="Delete"
-              aria-label="Delete"
-              onClick={async () => {
-                if (row.isCurrentUser) return;
-                setConfirmUserId(row.id);
-                setConfirmMessage('Are you sure you want to delete this user?');
-                setConfirmOpen(true);
-              }}
-              disabled={busy || row.isCurrentUser}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
-                <path d="M6 7h12M9 7V5h6v2m-7 4v8m4-8v8m4-8v8M7 7l1 12m8-12-1 12" strokeWidth="1.5" />
-              </svg>
-            </button>
+            {canEditUser ? (
+              <button
+                type="button"
+                className="text-[#0D542B]"
+                title="Edit"
+                aria-label="Edit"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setEditUserId(row.id);
+                  setUsernameI(row.username);
+                  const parts = String(row.fullName || "").split(" ");
+                  setFirstNameI(parts[0] || "");
+                  setLastNameI(parts.slice(1).join(" "));
+                  setEmailI(row.email);
+                  setRoleI(row.role);
+                  setSiteI(row.siteName);
+                  setPasswordI("");
+                  setEditOpen(true);
+                  setSuccess(null);
+                  setError(null);
+                }}
+                disabled={busy}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
+                </svg>
+              </button>
+            ) : null}
+            {canDeleteUser ? (
+              <button
+                type="button"
+                className="text-red-600"
+                title="Delete"
+                aria-label="Delete"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (row.isCurrentUser) return;
+                  setConfirmUserId(row.id);
+                  setConfirmMessage('Are you sure you want to delete this user?');
+                  setConfirmOpen(true);
+                }}
+                disabled={busy || row.isCurrentUser}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+                  <path d="M6 7h12M9 7V5h6v2m-7 4v8m4-8v8m4-8v8M7 7l1 12m8-12-1 12" strokeWidth="1.5" />
+                </svg>
+              </button>
+            ) : null}
           </div>
           )
         ),
       },
     ]
-  ), [busy, query, role, siteId, users]);
+  ), [busy, query, role, siteId, users, canDeleteUser, canEditUser]);
 
   const resetForm = () => {
     setEditUserId(null);
@@ -559,6 +611,7 @@ export default function UserManagementPage() {
               setError(null);
             }}
             className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm whitespace-nowrap"
+            style={!canCreateUser ? { display: 'none' } : undefined}
           >
             Add User
             <span className="ml-1">+</span>

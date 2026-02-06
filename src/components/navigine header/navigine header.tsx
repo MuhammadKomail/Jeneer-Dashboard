@@ -19,9 +19,10 @@ interface HeaderProps {
   showBell?: boolean;
   offsetLeft?: number;
   onLogout?: () => void;
+  canAccessHref?: (href: string) => boolean;
 }
 
-export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false, offsetLeft = 80, onLogout }: HeaderProps) {
+export default function NavigineHeader({ title, trail = [], tabs = [], activeIndex = 0, variant = 'default', userName, userRole, avatarUrl, showBell = false, offsetLeft = 80, onLogout, canAccessHref }: HeaderProps) {
   const { t } = useTranslation();
   const pathname = usePathname()?.replace(/^\/+/, '') || '';
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,6 +52,27 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
     if (!name) return '';
     const parts = name.trim().split(' ');
     return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
+  };
+
+  const formatRole = (role?: string) => {
+    const raw = String(role || '').trim();
+    if (!raw) return '';
+    const cleaned = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return cleaned
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const displayRole = formatRole(userRole);
+
+  const canShow = (href: string) => {
+    try {
+      return canAccessHref ? canAccessHref(href) : true;
+    } catch {
+      return true;
+    }
   };
 
   return (
@@ -132,7 +154,7 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
                     </div>
                     <div className="leading-tight text-left hidden sm:block">
                       {userName && <div className="text-sm text-gray-900">{userName}</div>}
-                      {userRole && <div className="text-xs text-gray-500">{userRole}</div>}
+                      {displayRole && <div className="text-xs text-gray-500">{displayRole}</div>}
                     </div>
                   </button>
 
@@ -149,22 +171,28 @@ export default function NavigineHeader({ title, trail = [], tabs = [], activeInd
                         </div>
                         <div className="leading-tight">
                           {userName && <div className="text-sm font-medium text-gray-900">{userName}</div>}
-                          {userRole && <div className="text-xs text-gray-500">{userRole}</div>}
+                          {displayRole && <div className="text-xs text-gray-500">{displayRole}</div>}
                         </div>
                       </div>
 
                       <div className="py-2 text-sm select-none">
                         <div className="px-4 pb-1 text-xs font-semibold text-gray-500">Management</div>
-                        <Link href="/user-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
-                          <span>User Management</span>
-                        </Link>
-                        <Link href="/site-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
-                          <span>Site Management</span>
-                        </Link>
+                        {canShow('/user-management') ? (
+                          <Link href="/user-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                            <span>User Management</span>
+                          </Link>
+                        ) : null}
+                        {canShow('/site-management') ? (
+                          <Link href="/site-management" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                            <span>Site Management</span>
+                          </Link>
+                        ) : null}
                         <div className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500">Privacy</div>
-                        <Link href="/change-password" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
-                          <span>Change Password</span>
-                        </Link>
+                        {canShow('/change-password') ? (
+                          <Link href="/change-password" className="flex items-center justify-between px-4 py-2 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                            <span>Change Password</span>
+                          </Link>
+                        ) : null}
                       </div>
 
                       <div className="border-t">

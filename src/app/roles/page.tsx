@@ -4,12 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Paper,
   Stack,
   TextField,
   Typography,
-  Chip,
   Toolbar,
   Dialog,
   DialogTitle,
@@ -17,7 +17,10 @@ import {
   DialogActions,
   Snackbar,
   Alert,
-  Autocomplete
+  FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormLabel
 } from '@mui/material';
 import DataTable, { Column } from '@/components/table/DataTable';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -53,8 +56,9 @@ const RolesPage: React.FC = () => {
   const [newId, setNewId] = useState('');
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newTables, setNewTables] = useState<string[]>(['auth_users', 'device', 'locations']);
+  const [newTables, setNewTables] = useState<string[]>(presetTables);
   const [newRoutes, setNewRoutes] = useState<string[]>(['dashboard', 'user-management']);
+  const [newIdTouched, setNewIdTouched] = useState(false);
 
   // Edit dialog state
   const [openEdit, setOpenEdit] = useState(false);
@@ -80,16 +84,8 @@ const RolesPage: React.FC = () => {
 
   const columns: Column<Role>[] = useMemo(() => ([
     { key: 'name', header: 'Name' },
-    { key: 'id', header: 'ID' },
     { key: 'description', header: 'Description', render: (r) => (
       <span className="truncate inline-block max-w-[320px] align-middle">{r.description || ''}</span>
-    ) },
-    { key: 'allowed_tables', header: 'Allowed Tables', render: (r) => (
-      <div className="flex flex-wrap gap-1">
-        {r.allowed_tables?.map((t) => (
-          <span key={t} className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-800 border">{t}</span>
-        ))}
-      </div>
     ) },
     { key: 'allowed_routes', header: 'Allowed Routes', render: (r) => (
       <div className="flex flex-wrap gap-1">
@@ -150,11 +146,12 @@ const RolesPage: React.FC = () => {
   const handleAdd = async () => {
     setBusy(true); setError(null); setSuccess(null);
     try {
+      const finalId = newId.trim() || toSnakeId(newName);
       const body = {
-        id: newId.trim(),
+        id: finalId,
         name: newName.trim(),
         description: newDescription.trim() || undefined,
-        allowed_tables: newTables,
+        allowed_tables: presetTables,
         allowed_routes: newRoutes,
       };
       const res = await fetch('/admin/api/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -165,7 +162,7 @@ const RolesPage: React.FC = () => {
       if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to add role');
       setSuccess('Role created');
       setOpenAdd(false);
-      setNewId(''); setNewName(''); setNewDescription(''); setNewTables(['auth_users', 'device', 'locations']); setNewRoutes(['dashboard', 'user-management']);
+      setNewId(''); setNewName(''); setNewDescription(''); setNewTables(presetTables); setNewRoutes(['dashboard', 'user-management']); setNewIdTouched(false);
       await fetchRoles();
     } catch (e: any) {
       setError(e?.message || 'Failed to add role');
@@ -190,7 +187,8 @@ const RolesPage: React.FC = () => {
   };
 
   const openEditDialog = (r: Role) => {
-    setEditRole(r);
+    // Allowed tables should always be all tables; keep routes editable
+    setEditRole({ ...r, allowed_tables: presetTables });
     setOpenEdit(true);
   };
 
@@ -201,7 +199,7 @@ const RolesPage: React.FC = () => {
       const body = {
         name: editRole.name,
         description: editRole.description,
-        allowed_tables: editRole.allowed_tables,
+        allowed_tables: presetTables,
         allowed_routes: editRole.allowed_routes,
       };
       const res = await fetch(`/admin/api/roles/${encodeURIComponent(editRole.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -213,10 +211,49 @@ const RolesPage: React.FC = () => {
       setSuccess('Role updated');
       setOpenEdit(false);
       await fetchRoles();
+
+      try {
+        const meRes = await fetch('/admin/api/auth/me', { cache: 'no-store' });
+        const meData = await meRes.json().catch(() => ({}));
+        if (meRes.status === 401 || meData?.reason === 'invalid_token' || meData?.error === 'unauthorized') {
+          return handleUnauthorized();
+        }
+        if (meRes.ok && meData) {
+          try { if (meData?.user) localStorage.setItem('user', JSON.stringify(meData.user)); } catch { }
+          try {
+            const role = meData?.user?.role;
+            if (typeof role === 'string') localStorage.setItem('role', role);
+            if (Array.isArray(meData?.allowed_tables)) localStorage.setItem('allowed_tables', JSON.stringify(meData.allowed_tables));
+            if (Array.isArray(meData?.allowed_routes)) localStorage.setItem('allowed_routes', JSON.stringify(meData.allowed_routes));
+          } catch { }
+          try { sessionStorage.setItem('did_fetch_auth_me', '1'); } catch { }
+          try { window.dispatchEvent(new Event('permissions_updated')); } catch { }
+        }
+      } catch { }
     } catch (e: any) {
       setError(e?.message || 'Failed to update role');
     } finally { setBusy(false); }
   };
+
+  const toggleValue = (list: string[], value: string) => {
+    return list.includes(value) ? list.filter(v => v !== value) : [...list, value];
+  };
+
+  const toSnakeId = (value: string) => {
+    const v = String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return v;
+  };
+
+  useEffect(() => {
+    if (!openAdd) return;
+    if (newIdTouched) return;
+    const next = toSnakeId(newName);
+    setNewId(next);
+  }, [newName, newIdTouched, openAdd]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -263,26 +300,25 @@ const RolesPage: React.FC = () => {
         <DialogTitle>Add Role</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Stack spacing={2}>
-            <TextField label="ID" value={newId} onChange={e => setNewId(e.target.value)} placeholder="manager" fullWidth size="small" />
-            <TextField label="Name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Manager" fullWidth size="small" />
+            <TextField label="Name" value={newName} onChange={e => { setNewName(e.target.value); }} placeholder="Manager" fullWidth size="small" />
             <TextField label="Description" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Manager role" fullWidth size="small" />
-            <Autocomplete multiple options={presetTables}
-              value={newTables}
-              onChange={(_, v) => setNewTables(v)}
-              renderTags={(value, getTagProps) => value.map((option, index) => (<Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />))}
-              renderInput={(params) => <TextField {...params} size="small" label="Allowed Tables" placeholder="Add table" />}
-            />
-            <Autocomplete multiple options={presetRoutes}
-              value={newRoutes}
-              onChange={(_, v) => setNewRoutes(v)}
-              renderTags={(value, getTagProps) => value.map((option, index) => (<Chip color="success" variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />))}
-              renderInput={(params) => <TextField {...params} size="small" label="Allowed Routes" placeholder="Add route" />}
-            />
+            <FormControl component="fieldset" variant="standard">
+              <FormLabel component="legend">Allowed Routes</FormLabel>
+              <FormGroup sx={{ maxHeight: 180, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 1, px: 1, py: 0.5 }}>
+                {presetRoutes.map((rt) => (
+                  <FormControlLabel
+                    key={rt}
+                    control={<Checkbox size="small" checked={newRoutes.includes(rt)} onChange={() => setNewRoutes((prev) => toggleValue(prev, rt))} />}
+                    label={rt}
+                  />
+                ))}
+              </FormGroup>
+            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenAdd(false)} disabled={busy}>Cancel</Button>
-          <Button variant="contained" onClick={handleAdd} disabled={busy || !newId.trim() || !newName.trim()}>{busy ? 'Saving...' : 'Save'}</Button>
+          <Button variant="contained" onClick={handleAdd} disabled={busy || !newName.trim()}>{busy ? 'Saving...' : 'Save'}</Button>
         </DialogActions>
       </Dialog>
 
@@ -292,21 +328,26 @@ const RolesPage: React.FC = () => {
         <DialogContent sx={{ pt: 2 }}>
           {editRole && (
             <Stack spacing={2}>
-              <TextField label="ID" value={editRole.id} disabled fullWidth size="small" />
               <TextField label="Name" value={editRole.name} onChange={e => setEditRole({ ...editRole, name: e.target.value })} fullWidth size="small" />
               <TextField label="Description" value={editRole.description || ''} onChange={e => setEditRole({ ...editRole, description: e.target.value })} fullWidth size="small" />
-              <Autocomplete multiple options={presetTables}
-                value={editRole.allowed_tables || []}
-                onChange={(_, v) => setEditRole({ ...editRole, allowed_tables: v })}
-                renderTags={(value, getTagProps) => value.map((option, index) => (<Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />))}
-                renderInput={(params) => <TextField {...params} size="small" label="Allowed Tables" placeholder="Add table" />}
-              />
-              <Autocomplete multiple options={presetRoutes}
-                value={editRole.allowed_routes || []}
-                onChange={(_, v) => setEditRole({ ...editRole, allowed_routes: v })}
-                renderTags={(value, getTagProps) => value.map((option, index) => (<Chip color="success" variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />))}
-                renderInput={(params) => <TextField {...params} size="small" label="Allowed Routes" placeholder="Add route" />}
-              />
+              <FormControl component="fieldset" variant="standard">
+                <FormLabel component="legend">Allowed Routes</FormLabel>
+                <FormGroup sx={{ maxHeight: 180, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 1, px: 1, py: 0.5 }}>
+                  {presetRoutes.map((rt) => (
+                    <FormControlLabel
+                      key={rt}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={(editRole.allowed_routes || []).includes(rt)}
+                          onChange={() => setEditRole({ ...editRole, allowed_routes: toggleValue(editRole.allowed_routes || [], rt) })}
+                        />
+                      }
+                      label={rt}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
             </Stack>
           )}
         </DialogContent>

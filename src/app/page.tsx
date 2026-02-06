@@ -17,7 +17,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Collapse from '@mui/material/Collapse';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandLess from '@mui/icons-material/ExpandLess';
@@ -109,6 +109,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number>(1); // default to "User Management"
   const pathname = usePathname();
+  const router = useRouter();
+  const [allowedRoutesState, setAllowedRoutesState] = useState<string[]>([]);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [selectedWell, setSelectedWell] = useState<string | null>(null);
@@ -129,6 +131,60 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const headerUser = authState?.user?.user || authState?.user || lsUser || null;
   const headerName = headerUser?.full_name || headerUser?.username || headerUser?.email || 'User';
   const headerRole = authState?.user?.role || headerUser?.role || authState?.role || lsRole || 'User';
+
+  const normalizedPath = React.useMemo(() => {
+    const p = pathname || '/';
+    const np = p.startsWith('/admin') ? p.replace(/^\/admin/, '') : p;
+    return np || '/';
+  }, [pathname]);
+
+  const isSuperAdmin = React.useMemo(() => {
+    const r = String(headerRole || '').trim().toLowerCase();
+    return r === 'admin' || r === 'system administrator' || r === 'system admin' || r === 'super admin';
+  }, [headerRole]);
+
+  const allowedRoutes = allowedRoutesState;
+
+  useEffect(() => {
+    const readAllowedRoutes = () => {
+      try {
+        const raw = localStorage.getItem('allowed_routes');
+        const parsed = raw ? JSON.parse(raw) : null;
+        const next = Array.isArray(parsed) ? parsed.map((x) => String(x)) : [];
+        setAllowedRoutesState(next);
+      } catch {
+        setAllowedRoutesState([]);
+      }
+    };
+
+    if (typeof window === 'undefined') return;
+    readAllowedRoutes();
+
+    const onPermUpdate = () => readAllowedRoutes();
+    window.addEventListener('permissions_updated', onPermUpdate as any);
+    return () => window.removeEventListener('permissions_updated', onPermUpdate as any);
+  }, []);
+
+  const permissionKeyForPath = React.useMemo(() => {
+    return {
+      '/dashboard': 'dashboard',
+      '/user-management': 'users:list',
+      '/roles': 'roles:manage',
+      '/site-management': 'locations',
+      '/change-password': 'change_password',
+    } as Record<string, string>;
+  }, []);
+
+  const canAccessPath = React.useCallback(
+    (path: string) => {
+      if (isSuperAdmin) return true;
+      const key = permissionKeyForPath[path];
+      if (!key) return true; // if not mapped, don't block
+      if (!allowedRoutes || allowedRoutes.length === 0) return true; // fail-open until permissions loaded
+      return allowedRoutes.includes(key);
+    },
+    [allowedRoutes, isSuperAdmin, permissionKeyForPath]
+  );
 
   // Initialize sidebar openness: desktop open, mobile collapsed
   useEffect(() => {
@@ -330,12 +386,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     })();
     (async () => {
       try {
+        // Avoid hitting /auth/me repeatedly; once per tab/session unless data is missing
+        try {
+          const alreadyFetched = sessionStorage.getItem('did_fetch_auth_me') === '1';
+          const hasUser = !!localStorage.getItem('user');
+          const hasRole = !!localStorage.getItem('role');
+          const hasAllowedRoutes = (() => {
+            try {
+              const raw = localStorage.getItem('allowed_routes');
+              const parsed = raw ? JSON.parse(raw) : null;
+              return Array.isArray(parsed) && parsed.length > 0;
+            } catch {
+              return false;
+            }
+          })();
+          if (alreadyFetched && hasUser && hasRole && hasAllowedRoutes) {
+            return;
+          }
+        } catch { }
+
         const res = await fetch('/admin/api/auth/me', { cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
         if (ignore) return;
         if (res.ok && data) {
-          console.log('data: ', data);
-
           // Also persist only the nested user object for direct access
           try { if (data?.user) localStorage.setItem('user', JSON.stringify(data.user)); } catch { }
 
@@ -352,11 +425,46 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               localStorage.setItem('allowed_routes', JSON.stringify(data.allowed_routes));
             }
           } catch { }
+
+          // Mark as fetched for this tab/session
+          try { sessionStorage.setItem('did_fetch_auth_me', '1'); } catch { }
         }
       } catch { }
     })();
     return () => { ignore = true; };
   }, [isDashboard, isAuthenticated]);
+
+  // Guard: redirect if user opens a page they don't have access to
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (isSuperAdmin) return;
+    if (!isLoaded) return;
+
+    const topLevelPath = (() => {
+      const seg = normalizedPath.split('?')[0].split('#')[0];
+      if (seg === '/' || seg.startsWith('/dashboard')) return '/dashboard';
+      if (seg.startsWith('/user-management')) return '/user-management';
+      if (seg.startsWith('/roles')) return '/roles';
+      if (seg.startsWith('/site-management')) return '/site-management';
+      if (seg.startsWith('/change-password')) return '/change-password';
+      return seg;
+    })();
+
+    if (!canAccessPath(topLevelPath)) {
+      const fallback = (() => {
+        if (!allowedRoutes || allowedRoutes.length === 0) return '/dashboard';
+        const ordered = ['/dashboard', '/user-management', '/roles', '/site-management', '/change-password'];
+        for (const p of ordered) {
+          if (canAccessPath(p)) return p;
+        }
+        return '/dashboard';
+      })();
+
+      if (topLevelPath !== fallback) {
+        router.replace(fallback);
+      }
+    }
+  }, [allowedRoutes, canAccessPath, isAuthenticated, isLoaded, isSuperAdmin, normalizedPath, router]);
 
   if (!isLoaded || isAuthenticated === null) {
     return null;
@@ -372,7 +480,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { text: 'Role Management', href: '/roles', icon: <ManageAccountsOutlinedIcon /> },
     { text: 'Site Management', href: '/site-management', icon: <RoomOutlinedIcon /> },
     { text: 'Change Password', href: '/change-password', icon: <LockOutlinedIcon /> },
-  ];
+  ].filter((i) => canAccessPath(i.href));
 
 
   const userData = {
@@ -650,75 +758,80 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             }
 
             return (
-              <NavigineHeader
-                title={title}
-                variant="compact"
-                trail={trail}
-                showBell
-                userName={headerName}
-                userRole={headerRole}
-                offsetLeft={open ? drawerWidth : drawerNarrowWidth}
-                onLogout={() => setConfirmLogoutOpen(true)}
-              />
+              <>
+                <NavigineHeader
+                  title={title}
+                  trail={trail}
+                  variant="compact"
+                  userName={headerName}
+                  userRole={headerRole}
+                  offsetLeft={open ? drawerWidth : drawerNarrowWidth}
+                  onLogout={() => setConfirmLogoutOpen(true)}
+                  canAccessHref={canAccessPath}
+                />
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    flexGrow: 1,
+                    overflow: 'auto',
+                    backgroundColor: 'transparent',
+                    mt: '64px',
+                  }}
+                >
+                  {(() => {
+                    const well = selectedWell ? selectedWell.split('__')[1] : null;
+                    const view = searchParams?.get('view');
+                    if (!isDashboard) return children;
+                    if (!well && isSitesLoading) {
+                      return (
+                        <Box sx={{ display: 'grid', gap: 2 }}>
+                          <Skeleton variant="rounded" height={220} />
+                          <Skeleton variant="rounded" height={220} />
+                        </Box>
+                      );
+                    }
+                    if (view === 'history') return <HistoryPage />; // forced full-page history
+                    if (view === 'settings') return <SettingsPage />; // forced full-page settings
+                    // Overview (Wellfield Overview) shows charts-only; individual wells show charts + tables
+                    if (well) {
+                      if (well === 'Wellfield Overview') {
+                        const group = dashboardSites.find(g => selectedWell?.startsWith(`${g.site}__`));
+                        const companyId = group?.company_id || 0;
+                        return <Overview companyId={companyId} />;
+                      }
+                      return <DeviceOverview deviceSerial={well} />;
+                    }
+                    // Parent site clicked (no specific well selected): show map with all devices for that site
+                    if (expandedSite) {
+                      // Compute a reasonable center from markers
+                      const center = (() => {
+                        if (!siteMarkers.length) return { lat: 34.0522, lng: -118.2437 };
+                        const sum = siteMarkers.reduce(
+                          (acc, m) => ({ lat: acc.lat + m.position.lat, lng: acc.lng + m.position.lng }),
+                          { lat: 0, lng: 0 }
+                        );
+                        return { lat: sum.lat / siteMarkers.length, lng: sum.lng / siteMarkers.length };
+                      })();
+                      return (
+                        <GoogleMapView
+                          center={center}
+                          zoom={12}
+                          markers={siteMarkers}
+                          fullScreen
+                          anchorSelector=".MuiDrawer-paper"
+                          headerSelector="header.fixed, [data-app-header]"
+                          zIndex={10}
+                        />
+                      );
+                    }
+                    return children;
+                  })()}
+                </Box>
+              </>
             );
           })()}
-          <Box
-            sx={{
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              flexGrow: 1,
-              overflow: 'auto',
-              backgroundColor: 'transparent',
-              mt: '64px',
-            }}
-          >
-            {(() => {
-              const well = selectedWell ? selectedWell.split('__')[1] : null;
-              const view = searchParams?.get('view');
-              if (!isDashboard) return children;
-              if (!well && isSitesLoading) {
-                return (
-                  <Box sx={{ display: 'grid', gap: 2 }}>
-                    <Skeleton variant="rounded" height={220} />
-                    <Skeleton variant="rounded" height={220} />
-                  </Box>
-                );
-              }
-              if (view === 'history') return <HistoryPage />; // forced full-page history
-              if (view === 'settings') return <SettingsPage />; // forced full-page settings
-              // Overview (Wellfield Overview) shows charts-only; individual wells show charts + tables
-              if (well) {
-                if (well === 'Wellfield Overview') {
-                  const group = dashboardSites.find(g => selectedWell?.startsWith(`${g.site}__`));
-                  const companyId = group?.company_id || 0;
-                  return <Overview companyId={companyId} />;
-                }
-                return <DeviceOverview deviceSerial={well} />;
-              }
-              // Parent site clicked (no specific well selected): show map with all devices for that site
-              if (expandedSite) {
-                // Compute a reasonable center from markers
-                const center = (() => {
-                  if (!siteMarkers.length) return { lat: 34.0522, lng: -118.2437 };
-                  const sum = siteMarkers.reduce((acc, m) => ({ lat: acc.lat + m.position.lat, lng: acc.lng + m.position.lng }), { lat: 0, lng: 0 });
-                  return { lat: sum.lat / siteMarkers.length, lng: sum.lng / siteMarkers.length };
-                })();
-                return (
-                  <GoogleMapView
-                    center={center}
-                    zoom={12}
-                    markers={siteMarkers}
-                    fullScreen
-                    anchorSelector=".MuiDrawer-paper"
-                    headerSelector="header.fixed, [data-app-header]"
-                    zIndex={10}
-                  />
-                );
-              }
-              return children;
-            })()}
-          </Box>
         </Main>
       </Box>
 
