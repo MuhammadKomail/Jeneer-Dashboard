@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 
 export type Column<Row> = {
   key: keyof Row | string;
-  header: string;
+  header: React.ReactNode;
   className?: string;
   cellClassName?: string;
   render?: (row: Row, rowIndex: number) => React.ReactNode;

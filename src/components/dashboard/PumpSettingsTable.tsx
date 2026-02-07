@@ -1,6 +1,12 @@
 import React from 'react';
 import DataTable, { Column } from '@/components/table/DataTable';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 import { usePathname, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -36,8 +42,12 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   const [total, setTotal] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
-  const [editing, setEditing] = React.useState<{ rowId: string; field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay'; value: string } | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [bulkEdit, setBulkEdit] = React.useState<{
+    field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay';
+    label: string;
+    value: string;
+  } | null>(null);
 
   const normalizeRows = React.useCallback((raw: any[]): SettingRow[] => {
     return raw.map((r: any, idx: number) => {
@@ -54,34 +64,32 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     });
   }, []);
 
-  const startEdit = (row: SettingRow, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
-    setEditing({ rowId: row.id, field, value: String(row[field] ?? '') });
+  const startBulkEdit = (field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay', label: string) => {
+    const first = (rows && rows.length > 0) ? rows[0] : null;
+    const initial = first ? String(first[field] ?? '') : '';
+    setBulkEdit({ field, label, value: initial });
   };
 
-  const saveEdit = async () => {
-    if (!editing || !deviceSerial) return;
-    const nextVal = Number(editing.value);
+  const saveBulkEdit = async () => {
+    if (!bulkEdit || !deviceSerial) return;
+    const nextVal = Number(bulkEdit.value);
     if (!Number.isFinite(nextVal)) {
       toast.error('Invalid number');
       return;
     }
 
-    const current = (rows || []).find(r => r.id === editing.rowId);
-    if (!current) {
-      toast.error('Row not found');
-      return;
-    }
+    const targetRowId = (() => {
+      const first = (rows && rows.length > 0) ? rows[0] : null;
+      return first?.id || '0';
+    })();
 
     setSaving(true);
     try {
       const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
-      const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings/${encodeURIComponent(editing.rowId)}`;
-      const body = {
-        threshold: editing.field === 'threshold' ? nextVal : current.threshold,
-        airOnTime: editing.field === 'airOnTime' ? nextVal : current.airOnTime,
-        airTimeout: editing.field === 'airTimeout' ? nextVal : current.airTimeout,
-        delay: editing.field === 'delay' ? nextVal : current.delay,
-      };
+      const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings/${encodeURIComponent(targetRowId)}`;
+
+      const body: any = { applyToAll: true };
+      body[bulkEdit.field] = nextVal;
 
       const res = await fetch(url, {
         method: 'PATCH',
@@ -98,10 +106,11 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
       setRows((prev) => {
         if (!prev) return prev;
-        return prev.map(r => r.id === editing.rowId ? { ...r, ...body } : r);
+        return prev.map(r => ({ ...r, [bulkEdit.field]: nextVal }));
       });
+
       toast.success('Settings updated');
-      setEditing(null);
+      setBulkEdit(null);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update settings');
     } finally {
@@ -109,71 +118,36 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     }
   };
 
-  const renderEditable = (row: SettingRow, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
-    const isActive = editing?.rowId === row.id && editing?.field === field;
-    if (!isActive) {
-      return (
-        <div className="inline-flex items-center gap-2">
-          <span>{row[field]}</span>
-          <button
-            type="button"
-            className="text-[#0D542B] disabled:opacity-50"
-            onClick={() => startEdit(row, field)}
-            disabled={saving}
-            aria-label={`Edit ${field}`}
-            title="Edit"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
-            </svg>
-          </button>
-        </div>
-      );
-    }
-
+  const headerWithEdit = React.useCallback((label: string, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
     return (
       <div className="inline-flex items-center gap-2">
-        <input
-          type="number"
-          value={editing?.value ?? ''}
-          onChange={(e) => setEditing((p) => p ? { ...p, value: e.target.value } : p)}
-          className="w-24 px-2 py-1 border rounded"
-          disabled={saving}
-        />
+        <span>{label}</span>
         <button
           type="button"
-          className="px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
-          onClick={saveEdit}
-          disabled={saving}
-          title="Save"
-          aria-label="Save"
+          className="text-white/90 hover:text-white disabled:opacity-50"
+          onClick={() => startBulkEdit(field, label)}
+          disabled={saving || !deviceSerial}
+          aria-label={`Edit ${label}`}
+          title="Edit"
         >
-          Save
-        </button>
-        <button
-          type="button"
-          className="px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
-          onClick={() => setEditing(null)}
-          disabled={saving}
-          title="Cancel"
-          aria-label="Cancel"
-        >
-          Cancel
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
+          </svg>
         </button>
       </div>
     );
-  };
+  }, [deviceSerial, saving, startBulkEdit]);
 
   const columns: Column<SettingRow>[] = React.useMemo(() => [
     { key: 'ts', header: 'Timestamp' },
     { key: 'highAdc', header: 'High ADC Reading' },
-    { key: 'threshold', header: 'ADC Threshold Setting', render: (row) => renderEditable(row, 'threshold') },
+    { key: 'threshold', header: headerWithEdit('ADC Threshold Setting', 'threshold') },
     { key: 'currentAdc', header: 'Current ADC' },
     { key: 'lowAdc', header: 'Low ADC Reading' },
-    { key: 'airOnTime', header: 'Air On Time', render: (row) => renderEditable(row, 'airOnTime') },
-    { key: 'airTimeout', header: 'Air Flow Timeout', render: (row) => renderEditable(row, 'airTimeout') },
-    { key: 'delay', header: 'Delay', render: (row) => renderEditable(row, 'delay') },
-  ], [renderEditable, saving, editing]);
+    { key: 'airOnTime', header: headerWithEdit('Air On Time', 'airOnTime') },
+    { key: 'airTimeout', header: headerWithEdit('Air Flow Timeout', 'airTimeout') },
+    { key: 'delay', header: headerWithEdit('Delay', 'delay') },
+  ], [headerWithEdit]);
 
   React.useEffect(() => {
     let ignore = false;
@@ -263,6 +237,27 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
           onPageSizeChange={(s)=>{ setPageSize(s); setPage(1); }}
         />
       )}
+
+      <Dialog open={!!bulkEdit} onClose={() => !saving && setBulkEdit(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Update {bulkEdit?.label}</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField
+            label={bulkEdit?.label}
+            type="number"
+            value={bulkEdit?.value ?? ''}
+            onChange={(e) => setBulkEdit((p) => (p ? { ...p, value: e.target.value } : p))}
+            fullWidth
+            size="small"
+            disabled={saving}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkEdit(null)} disabled={saving}>Cancel</Button>
+          <Button variant="contained" color="success" onClick={saveBulkEdit} disabled={saving || !bulkEdit?.value?.trim()}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

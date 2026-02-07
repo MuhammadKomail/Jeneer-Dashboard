@@ -12,6 +12,8 @@ type ApiUser = {
   role: string;
   site_id: number | null;
   site_name: string;
+  company_id?: number | null;
+  company_name?: string;
   is_active: boolean;
   is_current_user: boolean;
   created_at?: string;
@@ -65,6 +67,8 @@ type UserRow = {
   fullName: string;
   email: string;
   role: string;
+  companyId: number | null;
+  companyName: string;
   siteName: string;
   siteId: number | null;
   isCurrentUser: boolean;
@@ -170,6 +174,8 @@ export default function UserManagementPage() {
     fullName: u.full_name,
     email: u.email,
     role: u.role,
+    companyId: (u as any)?.company_id ?? null,
+    companyName: String((u as any)?.company_name ?? ''),
     siteName: u.site_name || "",
     siteId: u.site_id ?? null,
     isCurrentUser: !!u.is_current_user,
@@ -305,7 +311,6 @@ export default function UserManagementPage() {
   }, [companyId]);
 
   useEffect(() => {
-    setSiteI('');
     if (companyI) fetchLocations(companyI);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyI]);
@@ -356,7 +361,8 @@ export default function UserManagementPage() {
                   setLastNameI(parts.slice(1).join(" "));
                   setEmailI(row.email);
                   setRoleI(row.role);
-                  setSiteI(row.siteName);
+                  setCompanyI(row.companyId != null ? String(row.companyId) : '');
+                  setSiteI(row.siteId != null ? String(row.siteId) : '');
                   setPasswordI("");
                   setEditOpen(true);
                   setSuccess(null);
@@ -674,7 +680,14 @@ export default function UserManagementPage() {
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <select value={companyI} onChange={(e)=>setCompanyI(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm text-gray-700">
+                  <select
+                    value={companyI}
+                    onChange={(e) => {
+                      setCompanyI(e.target.value);
+                      setSiteI('');
+                    }}
+                    className="w-full border rounded-md px-3 py-2 text-sm text-gray-700"
+                  >
                     <option value="">Company</option>
                     {companies.map((c) => (
                       <option key={c.id} value={String(c.id)}>
@@ -767,7 +780,15 @@ export default function UserManagementPage() {
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <select value={companyI} onChange={(e)=>setCompanyI(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm text-gray-700">
+                  <select
+                    value={companyI}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setCompanyI(next);
+                      setSiteI('');
+                    }}
+                    className="w-full border rounded-md px-3 py-2 text-sm text-gray-700"
+                  >
                     <option value="">Company</option>
                     {companies.map((c) => (
                       <option key={c.id} value={String(c.id)}>

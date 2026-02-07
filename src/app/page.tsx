@@ -367,7 +367,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             return match ? decodeURIComponent(match[1]) : null;
           } catch { return null; }
         })();
-        const res = await fetch('/admin/api/companies/all/sites-with-devices?includeEmpty=false', {
+        const res = await fetch('/admin/api/companies/all/sites-with-devices', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           cache: 'no-store',
         });
