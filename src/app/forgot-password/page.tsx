@@ -14,10 +14,35 @@ import styles from "../login/login.module.css";
 export default function ForgotPassword() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/verify-code");
+    setError(null);
+    const nextEmail = email.trim();
+    if (!nextEmail) {
+      setError('Email is required');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/admin/api/auth/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: nextEmail }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || data?.error || 'Failed to send OTP');
+      }
+      try { sessionStorage.setItem('reset_email', nextEmail); } catch {}
+      router.push("/verify-code");
+    } catch (e: any) {
+      setError(e?.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,7 +60,10 @@ export default function ForgotPassword() {
                 <Label htmlFor="email" className="text-sm text-black font-bold">Email</Label>
                 <Input id="email" placeholder="john.doe@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="text-sm text-gray p-5" />
               </div>
-              <Button type="submit" className="w-full text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white">Receive Code</Button>
+              {error && <div className="text-sm text-red-600">{error}</div>}
+              <Button type="submit" disabled={loading} className="w-full text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white">
+                {loading ? 'Sending...' : 'Receive Code'}
+              </Button>
               <div className="text-center text-sm"><Link href="/login" className="text-[#3BA049] hover:text-[#33913F]">Back to login</Link></div>
             </form>
           </div>

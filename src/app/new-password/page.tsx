@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,13 +18,70 @@ export default function NewPassword() {
   const [show2, setShow2] = useState(false);
   const [pwd1, setPwd1] = useState("");
   const [pwd2, setPwd2] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const submit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const email = (() => {
+      try {
+        return sessionStorage.getItem('reset_email');
+      } catch {
+        return null;
+      }
+    })();
+    const verified = (() => {
+      try {
+        return sessionStorage.getItem('reset_otp_verified');
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!email) {
+      router.replace('/forgot-password');
+      return;
+    }
+    if (verified !== 'true') {
+      router.replace('/verify-code');
+    }
+  }, [router]);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!pwd1 || !pwd2) return;
-    if (pwd1 !== pwd2) return;
-    // TODO: integrate API then redirect
-    router.push("/login");
+    if (pwd1 !== pwd2) {
+      setError('Passwords do not match');
+      return;
+    }
+    const email = (() => { try { return sessionStorage.getItem('reset_email'); } catch { return null; } })();
+    const otp = (() => { try { return sessionStorage.getItem('reset_otp'); } catch { return null; } })();
+    if (!email || !otp) {
+      setError('Missing email/otp. Please start again.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/admin/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword: pwd1 }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || data?.error || 'Failed to reset password');
+      }
+      try {
+        sessionStorage.removeItem('reset_email');
+        sessionStorage.removeItem('reset_otp');
+        sessionStorage.removeItem('reset_otp_verified');
+      } catch {}
+      router.push('/login');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,7 +109,10 @@ export default function NewPassword() {
                   {show2 ? <IoEye size={20}/> : <IoEyeOff size={20}/>}
                 </button>
               </div>
-              <Button type="submit" className="w-full text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white">Update Password</Button>
+              {error && <div className="text-sm text-red-600">{error}</div>}
+              <Button type="submit" disabled={loading} className="w-full text-center bg-[#3BA049] hover:bg-[#33913F] text-sm sm:text-base py-3 sm:py-3 rounded-md text-white">
+                {loading ? 'Updating...' : 'Update Password'}
+              </Button>
               <div className="text-center text-sm"><Link href="/login" className="text-[#3BA049] hover:text-[#33913F]">Back to login</Link></div>
             </form>
           </div>
