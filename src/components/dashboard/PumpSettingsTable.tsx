@@ -20,6 +20,7 @@ type SettingRow = {
   airOnTime: number;
   airTimeout: number;
   delay: number;
+  volPerCycle: number;
 };
 
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
@@ -32,6 +33,7 @@ const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   airOnTime: 7,
   airTimeout: i % 4 === 0 ? 1 : 0,
   delay: 5,
+  volPerCycle: 123.45,
 }));
 
 const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
@@ -44,7 +46,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   const [pageSize, setPageSize] = React.useState<number>(10);
   const [saving, setSaving] = React.useState(false);
   const [bulkEdit, setBulkEdit] = React.useState<{
-    field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay';
+    field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle';
     label: string;
     value: string;
   } | null>(null);
@@ -60,11 +62,12 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       const airOnTime = Number(r?.airOnTime ?? r?.air_on_time ?? r?.air_on ?? 0) || 0;
       const airTimeout = Number(r?.airTimeout ?? r?.air_timeout ?? r?.air_flow_timeout ?? 0) || 0;
       const delay = Number(r?.delay ?? r?.start_delay ?? 0) || 0;
-      return { id, ts, highAdc, threshold, currentAdc, lowAdc, airOnTime, airTimeout, delay };
+      const volPerCycle = Number(r?.volPerCycle ?? r?.vol_per_cycle ?? r?.vol_percycle ?? 0) || 0;
+      return { id, ts, highAdc, threshold, currentAdc, lowAdc, airOnTime, airTimeout, delay, volPerCycle };
     });
   }, []);
 
-  const startBulkEdit = (field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay', label: string) => {
+  const startBulkEdit = (field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle', label: string) => {
     const first = (rows && rows.length > 0) ? rows[0] : null;
     const initial = first ? String(first[field] ?? '') : '';
     setBulkEdit({ field, label, value: initial });
@@ -89,7 +92,8 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings/${encodeURIComponent(targetRowId)}`;
 
       const body: any = { applyToAll: true };
-      body[bulkEdit.field] = nextVal;
+      const payloadKey = bulkEdit.field === 'volPerCycle' ? 'vol_per_cycle' : bulkEdit.field;
+      body[payloadKey] = nextVal;
 
       const res = await fetch(url, {
         method: 'PATCH',
@@ -118,7 +122,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     }
   };
 
-  const headerWithEdit = React.useCallback((label: string, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay') => {
+  const headerWithEdit = React.useCallback((label: string, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle') => {
     return (
       <div className="inline-flex items-center gap-2">
         <span>{label}</span>
@@ -147,6 +151,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     { key: 'airOnTime', header: headerWithEdit('Air On Time', 'airOnTime') },
     { key: 'airTimeout', header: headerWithEdit('Air Flow Timeout', 'airTimeout') },
     { key: 'delay', header: headerWithEdit('Delay', 'delay') },
+    { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle') },
   ], [headerWithEdit]);
 
   React.useEffect(() => {
@@ -240,14 +245,29 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
       <Dialog open={!!bulkEdit} onClose={() => !saving && setBulkEdit(null)} fullWidth maxWidth="xs">
         <DialogTitle>Update {bulkEdit?.label}</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <TextField
             label={bulkEdit?.label}
+            placeholder=""
+            InputLabelProps={{ shrink: true }}
             type="number"
             value={bulkEdit?.value ?? ''}
             onChange={(e) => setBulkEdit((p) => (p ? { ...p, value: e.target.value } : p))}
             fullWidth
             size="small"
+            margin="dense"
+            sx={{
+              mt: 1,
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: '#fff',
+              },
+              '& .MuiInputBase-input': {
+                color: '#111827',
+              },
+              '& .MuiInputLabel-root': {
+                color: '#374151',
+              },
+            }}
             disabled={saving}
           />
         </DialogContent>
