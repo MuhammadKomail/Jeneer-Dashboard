@@ -14,6 +14,31 @@ type HistoryRow = {
   battery: number;
 };
 
+const formatTimestamp = (raw: string): string => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+  if (Number.isNaN(parsed.getTime())) return s;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(parsed);
+  } catch {
+    return parsed.toLocaleString();
+  }
+};
+
+const format2 = (n: number): string => {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '';
+  return Number.isInteger(x) ? String(x) : x.toFixed(2);
+};
+
 const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
   ts: `2025-06-1${i} 08:06:40`,
   gallons: 2800 + (i % 7) * 15,
@@ -26,14 +51,14 @@ const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
 }));
 
 const columns: Column<HistoryRow>[] = [
-  { key: 'ts', header: 'Timestamp' },
-  { key: 'gallons', header: 'Gallons' },
+  { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
+  { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
   { key: 'cycle', header: 'Cycle' },
   { key: 'timeouts', header: 'Timeouts' },
-  { key: 'totalGallons', header: 'Total Gallons' },
+  { key: 'totalGallons', header: 'Total Gallons', render: (r) => format2(r.totalGallons) },
   { key: 'totalCycles', header: 'Total Cycles' },
   { key: 'totalTimeouts', header: 'Total Timeouts' },
-  { key: 'battery', header: 'Battery Voltage', render: (r) => r.battery.toFixed(1) },
+  { key: 'battery', header: 'Battery Voltage', render: (r) => format2(r.battery) },
 ];
 
 const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
@@ -97,7 +122,7 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           <button
             type="button"
             onClick={()=>{
-              const url = `${pathname}?view=history`;
+              const url = `${pathname}?view=history${deviceSerial ? `&device=${encodeURIComponent(deviceSerial)}` : ''}`;
               router.push(url);
             }}
             className="p-2 rounded-md border hover:bg-gray-50"

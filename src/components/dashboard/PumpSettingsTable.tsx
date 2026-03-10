@@ -23,6 +23,31 @@ type SettingRow = {
   volPerCycle: number;
 };
 
+const formatTimestamp = (raw: string): string => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+  if (Number.isNaN(parsed.getTime())) return s;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(parsed);
+  } catch {
+    return parsed.toLocaleString();
+  }
+};
+
+const format2 = (n: number): string => {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '';
+  return Number.isInteger(x) ? String(x) : x.toFixed(2);
+};
+
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   id: String(i + 1),
   ts: `2025-06-1${i} 08:06:40`,
@@ -143,7 +168,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   }, [deviceSerial, saving, startBulkEdit]);
 
   const columns: Column<SettingRow>[] = React.useMemo(() => [
-    { key: 'ts', header: 'Timestamp' },
+    { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
     { key: 'highAdc', header: 'High ADC Reading' },
     { key: 'threshold', header: headerWithEdit('ADC Threshold Setting', 'threshold') },
     { key: 'currentAdc', header: 'Current ADC' },
@@ -151,7 +176,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     { key: 'airOnTime', header: headerWithEdit('Air On Time', 'airOnTime') },
     { key: 'airTimeout', header: headerWithEdit('Air Flow Timeout', 'airTimeout') },
     { key: 'delay', header: headerWithEdit('Delay', 'delay') },
-    { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle') },
+    { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle'), render: (r) => format2(r.volPerCycle) },
   ], [headerWithEdit]);
 
   React.useEffect(() => {
@@ -205,7 +230,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
           <button
             type="button"
             onClick={()=>{
-              const url = `${pathname}?view=settings`;
+              const url = `${pathname}?view=settings${deviceSerial ? `&device=${encodeURIComponent(deviceSerial)}` : ''}`;
               router.push(url);
             }}
             className="p-2 rounded-md border hover:bg-gray-50"

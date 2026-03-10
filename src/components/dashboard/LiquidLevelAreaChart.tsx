@@ -18,14 +18,10 @@ const LiquidLevelAreaChart: React.FC<{ data?: Point[]; controls?: React.ReactNod
         <AreaChart data={data}>
           <XAxis
             dataKey="name"
-            tick={{ fontSize: 12 }}
+            tick={false}
+            height={0}
             tickLine={false}
             axisLine={false}
-            interval={0}
-            tickFormatter={(v: any) => {
-              const d = new Date(String(v));
-              return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
-            }}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip />

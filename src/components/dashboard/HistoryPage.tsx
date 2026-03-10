@@ -11,6 +11,8 @@ const HistoryPage: React.FC = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const deviceSerial = searchParams?.get('device') || undefined;
+
   const handleBack = () => {
     const params = new URLSearchParams(searchParams as any);
     params.delete('view');
@@ -24,7 +26,7 @@ const HistoryPage: React.FC = () => {
         <Button size="small" startIcon={<ArrowBackIcon />} onClick={handleBack}>Back</Button>
       </Box>
       <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #EAECF0', backgroundColor: '#fff' }}>
-        <HistoryTable />
+        <HistoryTable deviceSerial={deviceSerial} />
       </Paper>
     </Box>
   );
