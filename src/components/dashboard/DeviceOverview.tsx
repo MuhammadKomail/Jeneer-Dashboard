@@ -15,8 +15,8 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
   const [range, setRange] = React.useState<'1d' | '7d' | '1m' | '1y'>('1m');
   const days = range === '1d' ? 1 : range === '7d' ? 7 : range === '1m' ? 30 : 365;
 
-  const [temps, setTemps] = React.useState<Array<{ name: string; temperature: number }> | null>(null);
-  const [levels, setLevels] = React.useState<Array<{ name: string; level: number }> | null>(null);
+  const [cycleCounts, setCycleCounts] = React.useState<Array<{ name: string; cycleCount: number }> | null>(null);
+  const [timeouts, setTimeouts] = React.useState<Array<{ name: string; timeouts: number }> | null>(null);
   const [pressures, setPressures] = React.useState<Array<{ name: string; pressure: number }> | null>(null);
   const [gallons, setGallons] = React.useState<GallonsPoint[] | null>(null);
 
@@ -32,16 +32,16 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && json) {
-          const t = Array.isArray(json.temperature) ? json.temperature.map((r: any) => ({ name: r.ts, temperature: Number(r.value) || 0 })) : [];
-          const l = Array.isArray(json.liquid_level) ? json.liquid_level.map((r: any) => ({ name: r.ts, level: Number(r.value) || 0 })) : [];
+          const c = Array.isArray(json.cycle_count) ? json.cycle_count.map((r: any) => ({ name: r.ts, cycleCount: Number(r.value) || 0 })) : [];
+          const t = Array.isArray(json.timeouts) ? json.timeouts.map((r: any) => ({ name: r.ts, timeouts: Number(r.value) || 0 })) : [];
           const p = Array.isArray(json.focus_main_pressure) ? json.focus_main_pressure.map((r: any) => ({ name: r.ts, pressure: Number(r.value) || 0 })) : [];
           const g: GallonsPoint[] = Array.isArray(json.gallons_pumped) ? json.gallons_pumped.map((r: any) => ({ name: r.ts, gallons: Number(r.value) || 0 })) : [];
-          setTemps(t); setLevels(l); setPressures(p); setGallons(g);
+          setCycleCounts(c); setTimeouts(t); setPressures(p); setGallons(g);
         } else {
-          setTemps([]); setLevels([]); setPressures([]); setGallons([]);
+          setCycleCounts([]); setTimeouts([]); setPressures([]); setGallons([]);
         }
       } catch {
-        if (!ignore) { setTemps([]); setLevels([]); setPressures([]); setGallons([]); }
+        if (!ignore) { setCycleCounts([]); setTimeouts([]); setPressures([]); setGallons([]); }
       }
     })();
     return () => { ignore = true; };
@@ -56,7 +56,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
     </select>
   );
 
-  const loading = temps === null || levels === null || pressures === null || gallons === null;
+  const loading = cycleCounts === null || timeouts === null || pressures === null || gallons === null;
   if (loading) {
     return (
       <div className="fixed inset-0 z-40 bg-white/60 flex items-center justify-center">
@@ -72,10 +72,10 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
           <GallonsBarChart data={gallons || undefined} title={`Gallons Pumped (${deviceSerial})`} controls={controls} />
         </Grid>
         <Grid item xs={12} md={6}>
-          <LiquidLevelAreaChart data={levels || undefined} />
+          <LiquidLevelAreaChart data={cycleCounts || undefined} title="Cycle Count" dataKey="cycleCount" />
         </Grid>
         <Grid item xs={12} md={6}>
-          <TemperatureLineChart data={temps || undefined} />
+          <TemperatureLineChart data={timeouts || undefined} title="Timeouts" dataKey="timeouts" />
         </Grid>
         <Grid item xs={12} md={6}>
           <FocusMainPressureAreaChart data={pressures || undefined} />
