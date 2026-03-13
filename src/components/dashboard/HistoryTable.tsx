@@ -55,9 +55,6 @@ const columns: Column<HistoryRow>[] = [
   { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
   { key: 'cycle', header: 'Cycle' },
   { key: 'timeouts', header: 'Timeouts' },
-  { key: 'totalGallons', header: 'Total Gallons', render: (r) => format2(r.totalGallons) },
-  { key: 'totalCycles', header: 'Total Cycles' },
-  { key: 'totalTimeouts', header: 'Total Timeouts' },
   { key: 'battery', header: 'Battery Voltage', render: (r) => format2(r.battery) },
 ];
 
@@ -92,8 +89,8 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
   }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
-    const header = ['Timestamp','Gallons','Cycle','Timeouts','Total Gallons','Total Cycles','Total Timeouts','Battery Voltage'];
-    const lines = rows.map(r => [r.ts, r.gallons, r.cycle, r.timeouts, r.totalGallons, r.totalCycles, r.totalTimeouts, r.battery.toFixed(1)].join(','));
+    const header = ['Timestamp','Gallons','Cycle','Timeouts','Battery Voltage'];
+    const lines = rows.map(r => [r.ts, r.gallons, r.cycle, r.timeouts, r.battery].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
