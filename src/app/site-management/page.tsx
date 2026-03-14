@@ -89,6 +89,8 @@ export default function SiteManagementPage() {
   const [company, setCompany] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
 
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   const [rows, setRows] = useState<SiteRow[]>([]);
   const [siteDetails, setSiteDetails] = useState<Record<number, SiteDetail>>({});
   const [apiLoadingCount, setApiLoadingCount] = useState(0);
@@ -238,6 +240,10 @@ export default function SiteManagementPage() {
   };
 
   const handleCreateSite = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Unauthorized');
+      return;
+    }
     setSiteBusy(true);
     beginLoading();
     try {
@@ -337,6 +343,26 @@ export default function SiteManagementPage() {
     fetchSites();
   }, []);
 
+  useEffect(() => {
+    const readRole = () => {
+      try {
+        setUserRole(localStorage.getItem('role'));
+      } catch {
+        setUserRole(null);
+      }
+    };
+    if (typeof window === 'undefined') return;
+    readRole();
+    const onPermUpdate = () => readRole();
+    window.addEventListener('permissions_updated', onPermUpdate as any);
+    return () => window.removeEventListener('permissions_updated', onPermUpdate as any);
+  }, []);
+
+  const isSuperAdmin = useMemo(() => {
+    const r = String(userRole || '').trim().toLowerCase();
+    return r === 'admin' || r === 'system administrator' || r === 'system admin' || r === 'super admin';
+  }, [userRole]);
+
   const resetCompanyForm = () => {
     setCompanyNameI('');
     setCompanyAddressI('');
@@ -346,6 +372,10 @@ export default function SiteManagementPage() {
   };
 
   const handleCreateCompany = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Unauthorized');
+      return;
+    }
     setCompanyBusy(true);
     beginLoading();
     try {
@@ -459,26 +489,30 @@ export default function SiteManagementPage() {
               </option>
             ))}
           </select>
-          <button
-            onClick={() => {
-              resetCompanyForm();
-              setCompanyOpen(true);
-            }}
-            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-[#3BA049] text-[#0D542B] bg-white hover:bg-[#E7F3EB] text-sm whitespace-nowrap"
-          >
-            Add Company
-            <span className="ml-1">+</span>
-          </button>
-          <button
-            onClick={() => {
-              resetAddSiteForm();
-              setAddOpen(true);
-            }}
-            className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm whitespace-nowrap"
-          >
-            Add Site
-            <span className="ml-1">+</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => {
+                resetCompanyForm();
+                setCompanyOpen(true);
+              }}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-[#3BA049] text-[#0D542B] bg-white hover:bg-[#E7F3EB] text-sm whitespace-nowrap"
+            >
+              Add Company
+              <span className="ml-1">+</span>
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button
+              onClick={() => {
+                resetAddSiteForm();
+                setAddOpen(true);
+              }}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm whitespace-nowrap"
+            >
+              Add Site
+              <span className="ml-1">+</span>
+            </button>
+          )}
         </div>
       </div>
 
