@@ -215,7 +215,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-base font-semibold">Jeneer Floats Pump Settings</div>
+        <div className="text-base font-semibold">Jeneer FloatLes pump setting</div>
         <div className="flex items-center gap-2">
           <select
             value={range}

@@ -2,24 +2,21 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import GallonsBarChart, { GallonsPoint } from './GallonsBarChart';
-import FocusMainPressureBarChart, { PressurePoint } from './FocusMainPressureBarChart';
 import LiquidLevelBarChart, { LiquidLevelPoint } from './LiquidLevelBarChart';
 import TemperatureBarChart, { TemperaturePoint } from './TemperatureBarChart';
- 
+
 type Props = { companyId: number };
 
 const Overview: React.FC<Props> = ({ companyId }) => {
   const [gallons, setGallons] = React.useState<GallonsPoint[] | null>(null);
   const [levels, setLevels] = React.useState<LiquidLevelPoint[] | null>(null);
   const [temps, setTemps] = React.useState<TemperaturePoint[] | null>(null);
-  const [pressures, setPressures] = React.useState<PressurePoint[] | null>(null);
   // Unified range filter across all charts
   const [range, setRange] = React.useState<'1d' | '7d' | '1m' | '1y'>('1y');
   const days = range === '1d' ? 1 : range === '7d' ? 7 : range === '1m' ? 30 : 365;
 
   React.useEffect(() => {
     let ignore = false;
-    const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
     (async () => {
       try {
         const token = (() => {
@@ -51,32 +48,26 @@ const Overview: React.FC<Props> = ({ companyId }) => {
           const t: TemperaturePoint[] = Array.isArray(json.temperature_realtime)
             ? json.temperature_realtime.map((r: any) => ({ name: r.device_serial, temp: Number(r.value) || 0 }))
             : [];
-          const p: PressurePoint[] = Array.isArray(json.focus_main_pressure)
-            ? json.focus_main_pressure.map((r: any) => ({ name: r.device_serial, pressure: Number(r.value) || 0 }))
-            : [];
           setGallons(g);
           setLevels(l);
           setTemps(t);
-          setPressures(p);
         } else {
           setGallons([]);
           setLevels([]);
           setTemps([]);
-          setPressures([]);
         }
       } catch {
         if (!ignore) {
           setGallons([]);
           setLevels([]);
           setTemps([]);
-          setPressures([]);
         }
       }
     })();
     return () => { ignore = true; };
   }, [companyId, days]);
 
-  const loading = gallons === null || levels === null || temps === null || pressures === null;
+  const loading = gallons === null || levels === null || temps === null;
 
   if (loading) {
     return (
@@ -119,9 +110,6 @@ const Overview: React.FC<Props> = ({ companyId }) => {
         </Grid>
         <Grid item xs={12} sm={6} md={6} lg={6} xl={6}>
           <TemperatureBarChart data={temps || undefined} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={6} lg={6} xl={6}>
-          <FocusMainPressureBarChart data={pressures || undefined} />
         </Grid>
       </Grid>
     </Box>

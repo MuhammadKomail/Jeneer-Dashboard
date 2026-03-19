@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import DataTable, { Column } from "@/components/table/DataTable";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, Trash2 } from "lucide-react";
 
 type Company = {
   id: number;
@@ -89,6 +92,8 @@ export default function SiteManagementPage() {
   const [company, setCompany] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
 
+  const [companyFilterOpen, setCompanyFilterOpen] = useState(false);
+
   const [userRole, setUserRole] = useState<string | null>(null);
 
   const [rows, setRows] = useState<SiteRow[]>([]);
@@ -140,6 +145,32 @@ export default function SiteManagementPage() {
     setShowPumpForm(false);
   };
 
+  const handleDeleteCompany = async (companyId: number, companyName: string) => {
+    if (!isSuperAdmin) {
+      toast.error('Unauthorized');
+      return;
+    }
+
+    const ok = window.confirm(`Delete company "${companyName}"?`);
+    if (!ok) return;
+
+    beginLoading();
+    try {
+      const res = await fetch(`/admin/api/companies/${companyId}`, { method: 'DELETE' });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to delete company');
+
+      toast.success(data?.message || 'Company deleted');
+      if (company && company === companyName) setCompany('');
+      await fetchCompanies();
+      await fetchSites();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to delete company');
+    } finally {
+      endLoading();
+    }
+  };
+
   const openEditModal = (row: SiteRow) => {
     const detail = siteDetails[row.locationId];
     const src = detail || {
@@ -181,19 +212,19 @@ export default function SiteManagementPage() {
         .filter((d) => d.markedDelete && d.id)
         .map((d) => Number(d.id));
 
-      const devicesPayload = editDevices
-        .filter((d) => !d.markedDelete)
+      const activeDevices = editDevices.filter((d) => !d.markedDelete);
+      const devicesPayload = activeDevices
         .map((d) => {
           const payload: any = {
-            device_serial: String(d.device_serial ?? "").trim(),
-            product: String(d.product ?? "").trim(),
-            description: String(d.description ?? "").trim(),
-            well_id: Number(String(d.well_id ?? "").trim()),
+            device_serial: String(d.device_serial ?? '').trim(),
+            product: String(d.product ?? '').trim(),
+            description: String(d.description ?? '').trim(),
+            well_id: String(d.well_id ?? '').trim(),
           };
           if (d.id) payload.id = Number(d.id);
           return payload;
         })
-        .filter((d) => d.device_serial && d.product && d.description && Number.isFinite(d.well_id));
+        .filter((d) => d.device_serial && d.product && d.description);
 
       const body: any = {};
       if (editCompanyId) body.comp_id = Number(editCompanyId);
@@ -477,18 +508,65 @@ export default function SiteManagementPage() {
         </div>
 
         <div className="flex items-center gap-3 ml-auto">
-          <select
-            className="px-3 py-2 bg-white border rounded-md text-sm text-gray-700"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-          >
-            <option value="">By Company</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <Popover open={companyFilterOpen} onOpenChange={setCompanyFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 px-3 py-2 bg-white border rounded-md text-sm text-gray-700 flex items-center gap-2"
+              >
+                <span className="max-w-[180px] truncate">{company ? company : 'By Company'}</span>
+                <ChevronDown className="h-4 w-4 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-1">
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCompany('');
+                    setCompanyFilterOpen(false);
+                  }}
+                  className="w-full text-left px-2 py-2 text-sm rounded hover:bg-gray-50"
+                >
+                  By Company
+                </button>
+
+                <div className="max-h-64 overflow-auto">
+                  {companies.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-gray-50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCompany(c.name);
+                          setCompanyFilterOpen(false);
+                        }}
+                        className="flex-1 text-left text-sm truncate py-1"
+                        title={c.name}
+                      >
+                        {c.name}
+                      </button>
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteCompany(c.id, c.name);
+                          }}
+                          className="p-1 rounded hover:bg-red-50 text-red-600"
+                          title="Delete company"
+                          aria-label="Delete company"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           {isSuperAdmin && (
             <button
               onClick={() => {
