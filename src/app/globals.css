@@ -65,6 +65,12 @@ input:focus {
   outline: none;
 }
 
+/* Ensure Google Places Autocomplete dropdown is clickable above dialogs */
+.pac-container {
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

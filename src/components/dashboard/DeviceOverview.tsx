@@ -12,8 +12,7 @@ import PumpSettingsTable from './PumpSettingsTable';
 type Props = { deviceSerial: string };
 
 const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
-  const [range, setRange] = React.useState<'1d' | '7d' | '1m' | '1y'>('1m');
-  const days = range === '1d' ? 1 : range === '7d' ? 7 : range === '1m' ? 30 : 365;
+  const days = 365;
 
   const MAX_POINTS = 7;
 
@@ -27,6 +26,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
     return [...rows].sort((a, b) => toTime(a.name) - toTime(b.name)).slice(-MAX_POINTS);
   };
 
+  const [gallonsChartType, setGallonsChartType] = React.useState<'trend' | 'bar'>('bar');
   const [cycleChartType, setCycleChartType] = React.useState<'trend' | 'bar'>('bar');
   const [timeoutsChartType, setTimeoutsChartType] = React.useState<'trend' | 'bar'>('bar');
 
@@ -64,15 +64,6 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
     return () => { ignore = true; };
   }, [deviceSerial, days]);
 
-  const controls = (
-    <select value={range} onChange={(e)=>setRange(e.target.value as any)} className="px-2 py-1 border rounded text-xs text-gray-700 w-full sm:w-auto">
-      <option value="1d">Last 1 Day</option>
-      <option value="7d">Last 7 Days</option>
-      <option value="1m">Last 1 Month</option>
-      <option value="1y">Last 1 Year</option>
-    </select>
-  );
-
   const cycleControls = (
     <select value={cycleChartType} onChange={(e)=>setCycleChartType(e.target.value as any)} className="px-2 py-1 border rounded text-xs text-gray-700 w-full sm:w-auto">
       <option value="trend">Trend</option>
@@ -82,6 +73,13 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
 
   const timeoutsControls = (
     <select value={timeoutsChartType} onChange={(e)=>setTimeoutsChartType(e.target.value as any)} className="px-2 py-1 border rounded text-xs text-gray-700 w-full sm:w-auto">
+      <option value="trend">Trend</option>
+      <option value="bar">Bar</option>
+    </select>
+  );
+
+  const gallonsControls = (
+    <select value={gallonsChartType} onChange={(e)=>setGallonsChartType(e.target.value as any)} className="px-2 py-1 border rounded text-xs text-gray-700 w-full sm:w-auto">
       <option value="trend">Trend</option>
       <option value="bar">Bar</option>
     </select>
@@ -99,17 +97,21 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <GallonsBarChart data={gallons || undefined} title={`Gallons Pumped (${deviceSerial})`} controls={controls} />
+        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
+          {gallonsChartType === 'bar' ? (
+            <GallonsBarChart data={gallons || undefined} title={`Gallons Pumped (${deviceSerial})`} controls={gallonsControls} />
+          ) : (
+            <LiquidLevelAreaChart data={gallons as any} title={`Gallons Pumped (${deviceSerial})`} dataKey="gallons" controls={gallonsControls} />
+          )}
         </Grid>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
           {cycleChartType === 'bar' ? (
             <LiquidLevelBarChart data={cycleCounts || undefined} title="Cycle Count" dataKey="cycleCount" barColor="#F59E0B" controls={cycleControls} />
           ) : (
             <LiquidLevelAreaChart data={cycleCounts || undefined} title="Cycle Count" dataKey="cycleCount" controls={cycleControls} />
           )}
         </Grid>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
           {timeoutsChartType === 'bar' ? (
             <LiquidLevelBarChart data={timeouts || undefined} title="Timeouts" dataKey="timeouts" barColor="#3B82F6" controls={timeoutsControls} />
           ) : (

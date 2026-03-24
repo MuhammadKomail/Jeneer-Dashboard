@@ -62,7 +62,7 @@ const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
 }));
 
 const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
-  const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('7d');
+  const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('30d');
   const router = useRouter();
   const pathname = usePathname();
   const [rows, setRows] = React.useState<SettingRow[] | null>(null);
@@ -214,9 +214,9 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
         <div className="text-base font-semibold">Jeneer FloatLes pump setting</div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
           <select
             value={range}
             onChange={(e)=>setRange(e.target.value as any)}

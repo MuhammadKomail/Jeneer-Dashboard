@@ -308,7 +308,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         }
         if (lng == null || lat == null) return null;
         return {
-          id: String(d.id || d.device_serial || Math.random()),
+          id: String(d.id || d.device_serial || `${lat},${lng}`),
           label: d.device_serial,
           position: { lat, lng },
           color: 'green' as const,

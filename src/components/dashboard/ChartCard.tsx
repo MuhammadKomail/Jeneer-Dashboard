@@ -24,7 +24,7 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, children, rightC
           {rightControls}
         </Box>
       </Box>
-      <Box sx={{ width: { xs: 240, sm: 280, md: 340, lg: 380, xl: 420 }, minWidth: 0, height: 350 }}>
+      <Box sx={{ width: '100%', minWidth: 0, height: { xs: 260, sm: 320, md: 350 } }}>
         {children}
       </Box>
     </Paper>

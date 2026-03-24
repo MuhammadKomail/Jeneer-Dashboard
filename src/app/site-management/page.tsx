@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import MapPicker from "@/components/maps/MapPicker";
 import DataTable, { Column } from "@/components/table/DataTable";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,7 +67,8 @@ type DeviceInput = {
   device_serial: string;
   product: string;
   description: string;
-  well_id: number;
+  well_id: string;
+  geolocation?: string;
 };
 
 type SiteDetail = {
@@ -84,7 +86,56 @@ type DeviceEdit = {
   product: string;
   description: string;
   well_id: string;
+  geolocation?: string;
   markedDelete?: boolean;
+};
+
+const normalizeGeolocation = (raw: any): string | undefined => {
+  if (raw == null) return undefined;
+  if (Array.isArray(raw) && raw.length >= 2) {
+    const lng = Number(raw[0]);
+    const lat = Number(raw[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return undefined;
+    return `(${lng},${lat})`;
+  }
+  if (typeof raw === 'object') {
+    const lng = Number((raw as any).longitude ?? (raw as any).lng ?? (raw as any).x);
+    const lat = Number((raw as any).latitude ?? (raw as any).lat ?? (raw as any).y);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return undefined;
+    return `(${lng},${lat})`;
+  }
+  const s = String(raw).trim();
+  if (!s) return undefined;
+  const cleaned = s.replace(/^\(/, '').replace(/\)$/, '');
+  const parts = cleaned.split(',').map((x) => x.trim());
+  if (parts.length >= 2) {
+    const lng = Number(parts[0]);
+    const lat = Number(parts[1]);
+    if (Number.isFinite(lng) && Number.isFinite(lat)) return `(${lng},${lat})`;
+  }
+  return s;
+};
+
+const geolocationToPreview = (raw: any): string => {
+  const n = normalizeGeolocation(raw);
+  if (!n) return '';
+  const cleaned = n.replace(/^\(/, '').replace(/\)$/, '');
+  const [lngS, latS] = cleaned.split(',').map((x) => x?.trim());
+  const lng = Number(lngS);
+  const lat = Number(latS);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  return n;
+};
+
+const geolocationToLatLng = (raw: any): { lat: number; lng: number } | null => {
+  const n = normalizeGeolocation(raw);
+  if (!n) return null;
+  const cleaned = n.replace(/^\(/, '').replace(/\)$/, '');
+  const [lngS, latS] = cleaned.split(',').map((x) => x?.trim());
+  const lng = Number(lngS);
+  const lat = Number(latS);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
 };
 
 export default function SiteManagementPage() {
@@ -114,6 +165,12 @@ export default function SiteManagementPage() {
   const [deviceSerialI, setDeviceSerialI] = useState("");
   const [productI, setProductI] = useState("");
   const [descriptionI, setDescriptionI] = useState("");
+  const [latI, setLatI] = useState<number | null>(null);
+  const [lngI, setLngI] = useState<number | null>(null);
+  const [geoPreview, setGeoPreview] = useState<string>("");
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapMode, setMapMode] = useState<'add' | 'edit' | 'editNew'>('add');
+  const [mapEditIdx, setMapEditIdx] = useState<number | null>(null);
   const [wellIdI, setWellIdI] = useState("");
   const [devices, setDevices] = useState<DeviceInput[]>([]);
   const [showPumpForm, setShowPumpForm] = useState(false);
@@ -129,6 +186,9 @@ export default function SiteManagementPage() {
   const [editNewProduct, setEditNewProduct] = useState("");
   const [editNewDescription, setEditNewDescription] = useState("");
   const [editNewWellId, setEditNewWellId] = useState("");
+  const [editNewGeoPreview, setEditNewGeoPreview] = useState<string>('');
+  const [editNewLat, setEditNewLat] = useState<number | null>(null);
+  const [editNewLng, setEditNewLng] = useState<number | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<number | null>(null);
 
   const beginLoading = () => setApiLoadingCount((c) => c + 1);
@@ -141,6 +201,9 @@ export default function SiteManagementPage() {
     setProductI('');
     setDescriptionI('');
     setWellIdI('');
+    setLatI(null);
+    setLngI(null);
+    setGeoPreview('');
     setDevices([]);
     setShowPumpForm(false);
   };
@@ -192,6 +255,7 @@ export default function SiteManagementPage() {
         product: String(d.product ?? ""),
         description: String((d as any)?.description ?? ""),
         well_id: String((d as any)?.well_id ?? ""),
+        geolocation: normalizeGeolocation((d as any)?.geolocation),
         markedDelete: false,
       }))
     );
@@ -200,6 +264,9 @@ export default function SiteManagementPage() {
     setEditNewProduct("");
     setEditNewDescription("");
     setEditNewWellId("");
+    setEditNewGeoPreview('');
+    setEditNewLat(null);
+    setEditNewLng(null);
     setEditOpen(true);
   };
 
@@ -220,6 +287,7 @@ export default function SiteManagementPage() {
             product: String(d.product ?? '').trim(),
             description: String(d.description ?? '').trim(),
             well_id: String(d.well_id ?? '').trim(),
+            ...(d.geolocation ? { geolocation: String(d.geolocation) } : {}),
           };
           if (d.id) payload.id = Number(d.id);
           return payload;
@@ -349,18 +417,9 @@ export default function SiteManagementPage() {
   const fetchCompanies = async () => {
     beginLoading();
     try {
-      const res = await fetch('/admin/api/companies?page=1&pageSize=200&sort=name&order=asc', { cache: 'no-store' });
-      const data: CompaniesResponse = await res.json().catch(() => ({} as any));
-      if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to fetch companies');
-      const raw = Array.isArray(data?.data) ? (data.data as any[]) : [];
-      const normalized: Company[] = raw
-        .map((c) => {
-          const id = Number((c as any)?.id ?? (c as any)?.company_id);
-          const name = String((c as any)?.name ?? (c as any)?.company_name ?? '').trim();
-          if (!Number.isFinite(id) || !name) return null;
-          return { id, name };
-        })
-        .filter(Boolean) as Company[];
+      const res = await fetch('/admin/api/companies');
+      const data: any = await res.json().catch(() => ({}));
+      const normalized = (data?.data ?? []).filter(Boolean) as Company[];
       setCompanies(normalized);
     } catch {
       setCompanies([]);
@@ -600,6 +659,59 @@ export default function SiteManagementPage() {
         pageSizeOptions={[10, 20, 50]}
       />
 
+      <Dialog
+        open={mapOpen}
+        onOpenChange={(o) => {
+          setMapOpen(o);
+          if (!o) {
+            setMapEditIdx(null);
+            setMapMode('add');
+          }
+        }}
+        modal
+      >
+        <DialogContent className="max-w-3xl relative">
+          <DialogHeader>
+            <DialogTitle>Select Device Location</DialogTitle>
+          </DialogHeader>
+          <MapPicker
+            initialLat={
+              mapMode === 'editNew' ? (editNewLat ?? undefined) : (latI ?? undefined)
+            }
+            initialLng={
+              mapMode === 'editNew' ? (editNewLng ?? undefined) : (lngI ?? undefined)
+            }
+            onSelect={(la, ln) => {
+              if (mapMode === 'editNew') {
+                setEditNewLat(la);
+                setEditNewLng(ln);
+                setEditNewGeoPreview(`${la.toFixed(6)},${ln.toFixed(6)}`);
+                return;
+              }
+
+              setLatI(la);
+              setLngI(ln);
+              setGeoPreview(`${la.toFixed(6)},${ln.toFixed(6)}`);
+
+              if (mapMode === 'edit' && mapEditIdx != null) {
+                const geo = `(${ln},${la})`;
+                setEditDevices((prev) => prev.map((x, i) => (i === mapEditIdx ? { ...x, geolocation: geo } : x)));
+              }
+            }}
+            height={450}
+          />
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setMapOpen(false)}
+              className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm"
+            >
+              Done
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={addOpen} onOpenChange={(o) => !siteBusy && setAddOpen(o)}>
         <DialogContent className="max-w-2xl relative">
           <DialogHeader>
@@ -635,23 +747,27 @@ export default function SiteManagementPage() {
               )}
 
               {showPumpForm && (
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] gap-2 items-center">
-                  <input value={deviceSerialI} onChange={(e) => setDeviceSerialI(e.target.value)} placeholder="Device Serial" className="w-full border rounded-md px-3 py-2 text-sm" />
-                  <input value={productI} onChange={(e) => setProductI(e.target.value)} placeholder="Product" className="w-full border rounded-md px-3 py-2 text-sm" />
-                  <input value={descriptionI} onChange={(e) => setDescriptionI(e.target.value)} placeholder="Description" className="w-full border rounded-md px-3 py-2 text-sm" />
-                  <input value={wellIdI} onChange={(e) => setWellIdI(e.target.value)} placeholder="Well ID" className="w-full border rounded-md px-3 py-2 text-sm" />
+                <div className="mt-2 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] gap-2 items-center">
+                    <input value={deviceSerialI} onChange={(e) => setDeviceSerialI(e.target.value)} placeholder="Device Serial" className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <input value={productI} onChange={(e) => setProductI(e.target.value)} placeholder="Product" className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <input value={descriptionI} onChange={(e) => setDescriptionI(e.target.value)} placeholder="Description" className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <input value={wellIdI} onChange={(e) => setWellIdI(e.target.value)} placeholder="Well ID" className="w-full border rounded-md px-3 py-2 text-sm" />
+                    <input value={geoPreview} readOnly placeholder="Lat,Lng" className="w-full border rounded-md px-3 py-2 text-xs text-gray-700 bg-gray-100" />
+                    <button type="button" onClick={() => setMapOpen(true)} className="px-2 py-2 rounded-md border text-xs">Map</button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
-                      const nextWell = Number(wellIdI);
-                      if (!deviceSerialI || !productI || !descriptionI || !Number.isFinite(nextWell)) return;
+                      if (!deviceSerialI || !productI || !descriptionI || !wellIdI.trim()) return;
                       setDevices((prev) => [
                         ...prev,
                         {
-                          device_serial: deviceSerialI,
-                          product: productI,
-                          description: descriptionI,
-                          well_id: nextWell,
+                          device_serial: String(deviceSerialI).trim(),
+                          product: String(productI).trim(),
+                          description: String(descriptionI).trim(),
+                          well_id: wellIdI.trim(),
+                          geolocation: geoPreview ? `(${lngI},${latI})` : undefined,
                         },
                       ]);
                       setDeviceSerialI("");
@@ -791,7 +907,7 @@ export default function SiteManagementPage() {
               {editDevices.length > 0 && (
                 <div className="space-y-2">
                   {editDevices.map((d, idx) => (
-                    <div key={d.id ?? idx} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_1fr_1fr] gap-2 items-center">
+                    <div key={d.id ?? idx} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_auto] gap-2 items-center">
                       <label className="inline-flex items-center gap-2 text-xs text-gray-700">
                         <input
                           type="checkbox"
@@ -848,6 +964,30 @@ export default function SiteManagementPage() {
                         placeholder="Well ID"
                         className="w-full border rounded-md px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500"
                       />
+
+                      <input
+                        value={geolocationToPreview(d.geolocation)}
+                        readOnly
+                        disabled={!!d.markedDelete}
+                        placeholder="Lat,Lng"
+                        className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700 disabled:bg-gray-50 disabled:text-gray-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={!!d.markedDelete}
+                        onClick={() => {
+                          const ll = geolocationToLatLng(d.geolocation);
+                          setLatI(ll?.lat ?? null);
+                          setLngI(ll?.lng ?? null);
+                          setGeoPreview(geolocationToPreview(d.geolocation));
+                          setMapMode('edit');
+                          setMapEditIdx(idx);
+                          setMapOpen(true);
+                        }}
+                        className="inline-flex items-center justify-center px-3 py-2 rounded-md border text-sm bg-white hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        Pick on Map
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -855,23 +995,35 @@ export default function SiteManagementPage() {
 
               <div className="mt-3">
                 <div className="text-xs text-gray-600 mb-1">Add New Device</div>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto_auto] gap-2 items-center">
                   <input value={editNewDeviceSerial} onChange={(e) => setEditNewDeviceSerial(e.target.value)} placeholder="Device Serial" className="w-full border rounded-md px-3 py-2 text-sm" />
                   <input value={editNewProduct} onChange={(e) => setEditNewProduct(e.target.value)} placeholder="Product" className="w-full border rounded-md px-3 py-2 text-sm" />
                   <input value={editNewDescription} onChange={(e) => setEditNewDescription(e.target.value)} placeholder="Description" className="w-full border rounded-md px-3 py-2 text-sm" />
                   <input value={editNewWellId} onChange={(e) => setEditNewWellId(e.target.value)} placeholder="Well ID" className="w-full border rounded-md px-3 py-2 text-sm" />
+                  <input value={editNewGeoPreview} readOnly placeholder="Lat,Lng" className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700" />
                   <button
                     type="button"
                     onClick={() => {
-                      const nextWell = Number(editNewWellId);
-                      if (!editNewDeviceSerial || !editNewProduct || !editNewDescription || !Number.isFinite(nextWell)) return;
+                      setMapMode('editNew');
+                      setMapEditIdx(null);
+                      setMapOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center px-3 py-2 rounded-md border text-sm bg-white hover:bg-gray-50 whitespace-nowrap"
+                  >
+                    Pick on Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editNewDeviceSerial || !editNewProduct || !editNewDescription || !editNewWellId.trim()) return;
                       setEditDevices((prev) => [
                         ...prev,
                         {
                           device_serial: editNewDeviceSerial,
                           product: editNewProduct,
                           description: editNewDescription,
-                          well_id: String(nextWell),
+                          well_id: String(editNewWellId).trim(),
+                          geolocation: editNewLat != null && editNewLng != null ? `(${editNewLng},${editNewLat})` : undefined,
                           markedDelete: false,
                         },
                       ]);
@@ -879,6 +1031,9 @@ export default function SiteManagementPage() {
                       setEditNewProduct("");
                       setEditNewDescription("");
                       setEditNewWellId("");
+                      setEditNewGeoPreview('');
+                      setEditNewLat(null);
+                      setEditNewLng(null);
                     }}
                     className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-[#3BA049] hover:bg-[#33913F] text-white text-sm whitespace-nowrap"
                   >

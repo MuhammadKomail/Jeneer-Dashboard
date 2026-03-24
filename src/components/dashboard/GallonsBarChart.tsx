@@ -23,6 +23,22 @@ const formatTimestamp = (raw: unknown): string => {
   }
 };
 
+const formatTimeOnly = (raw: unknown): string => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+  if (Number.isNaN(parsed.getTime())) return s;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(parsed);
+  } catch {
+    return parsed.toLocaleTimeString();
+  }
+};
+
 const GallonsBarChart: React.FC<{ data?: GallonsPoint[]; title?: string; controls?: React.ReactNode }> = ({ data, title = 'Gallons Pumped', controls }) => {
   if (!data || data.length === 0) {
     return (
@@ -38,10 +54,14 @@ const GallonsBarChart: React.FC<{ data?: GallonsPoint[]; title?: string; control
         <BarChart data={data}>
           <XAxis
             dataKey="name"
-            tick={false}
-            height={0}
+            tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
+            interval={0}
+            angle={-35}
+            textAnchor="end"
+            height={50}
+            tickFormatter={(v: any) => formatTimeOnly(v)}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip labelFormatter={(label: any) => formatTimestamp(label)} />
