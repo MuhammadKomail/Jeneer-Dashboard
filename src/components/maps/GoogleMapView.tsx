@@ -63,6 +63,7 @@ export default function GoogleMapView({
     // Use a key-specific id so if the API key changes, the script reloads correctly
     id: key ? `google-map-script-${key.slice(-6)}` : "google-map-script",
     googleMapsApiKey: key,
+    libraries: ['places'],
   });
 
   const [activeMarker, setActiveMarker] = React.useState<string | null>(null);
