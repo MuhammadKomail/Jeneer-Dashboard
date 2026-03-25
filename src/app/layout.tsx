@@ -12,6 +12,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import "react-activity/dist/library.css";
 import "./globals.css";
 
+import "@/il8n";
+
 // shadcn Sidebar Components
 import { SidebarProvider } from '@/components/ui/sidebar';
 
