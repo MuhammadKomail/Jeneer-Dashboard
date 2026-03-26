@@ -59,15 +59,16 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
   flexGrow: 1,
   display: 'flex',
   flexDirection: 'column',
+  width: open ? `calc(100vw - ${drawerWidth}px)` : `calc(100vw - ${drawerNarrowWidth}px)`,
   padding: 0,
-  transition: theme.transitions.create('margin', {
+  transition: theme.transitions.create(['margin', 'width'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
   marginLeft: `${drawerNarrowWidth}px`,
   ...(open && {
     marginLeft: `${drawerWidth}px`,
-    transition: theme.transitions.create('margin', {
+    transition: theme.transitions.create(['margin', 'width'], {
       easing: theme.transitions.easing.easeOut,
       duration: theme.transitions.duration.enteringScreen,
     }),
@@ -775,6 +776,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                     display: 'flex',
                     flexDirection: 'column',
                     flexGrow: 1,
+                    width: '100%',
                     overflow: 'auto',
                     backgroundColor: 'transparent',
                     mt: '64px',
@@ -819,6 +821,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                           center={center}
                           zoom={12}
                           markers={siteMarkers}
+                          fitToMarkers={true}
                           fullScreen
                           anchorSelector=".MuiDrawer-paper"
                           headerSelector="header.fixed, [data-app-header]"

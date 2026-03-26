@@ -93,16 +93,22 @@ const Overview: React.FC<Props> = ({ companyId }) => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: { xs: 1, sm: 0 } }}>
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
-          <GallonsBarChart data={gallons || undefined} />
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: '100%', boxSizing: 'border-box', p: 2 }}>
+      <Grid container spacing={2} sx={{ width: '100%', maxWidth: '100%', m: 0 }}>
+        <Grid item xs={12} md={6} sx={{ minWidth: 0, display: 'flex' }}>
+          <Box sx={{ width: '100%' }}>
+            <GallonsBarChart data={gallons || undefined} />
+          </Box>
         </Grid>
-        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
-          <LiquidLevelBarChart data={cycleCounts || undefined} title="Cycle Count" dataKey="cycleCount" barColor="#F59E0B" />
+        <Grid item xs={12} md={6} sx={{ minWidth: 0, display: 'flex' }}>
+          <Box sx={{ width: '100%' }}>
+            <LiquidLevelBarChart data={cycleCounts || undefined} title="Cycle Count" dataKey="cycleCount" barColor="#F59E0B" />
+          </Box>
         </Grid>
-        <Grid item xs={12} md={6} sx={{ minWidth: 0 }}>
-          <LiquidLevelBarChart data={timeouts || undefined} title="Timeouts" dataKey="timeouts" barColor="#3B82F6" />
+        <Grid item xs={12} md={12} sx={{ minWidth: 0, display: 'flex' }}>
+          <Box sx={{ width: '100%' }}>
+            <LiquidLevelBarChart data={timeouts || undefined} title="Timeouts" dataKey="timeouts" barColor="#3B82F6" />
+          </Box>
         </Grid>
       </Grid>
     </Box>

@@ -29,6 +29,7 @@ interface GoogleMapViewProps {
   center?: { lat: number; lng: number };
   zoom?: number;
   markers?: MapMarker[];
+  fitToMarkers?: boolean;
   height?: number | string;
   fullScreen?: boolean;
   offsetTop?: number;
@@ -49,6 +50,7 @@ export default function GoogleMapView({
   center = defaultCenter,
   zoom = defaultZoom,
   markers = [],
+  fitToMarkers = false,
   height = 320,
   fullScreen = false,
   offsetTop = 0,
@@ -89,6 +91,35 @@ export default function GoogleMapView({
       } catch {}
     }
   }, [center]);
+
+  const markerSignature = React.useMemo(
+    () => markers.map((m) => `${m.id}:${m.position.lat},${m.position.lng}`).join('|'),
+    [markers]
+  );
+
+  React.useEffect(() => {
+    console.log('[fitToMarkers] Effect triggered:', { fitToMarkers, isLoaded, hasMap: !!mapRef.current, markerCount: markers.length });
+    if (!fitToMarkers || !isLoaded || !mapRef.current || markers.length === 0) return;
+    const g = typeof window !== 'undefined' ? (window as any).google : null;
+    if (!g?.maps) {
+      console.log('[fitToMarkers] Google maps not available');
+      return;
+    }
+
+    const map = mapRef.current;
+
+    if (markers.length === 1) {
+      console.log('[fitToMarkers] Single marker, centering:', markers[0].position);
+      map.setCenter(markers[0].position as any);
+      map.setZoom(Math.max(10, zoom));
+      return;
+    }
+
+    console.log('[fitToMarkers] Multiple markers, fitting bounds:', markers.length);
+    const bounds = new g.maps.LatLngBounds();
+    markers.forEach((m) => bounds.extend(m.position as any));
+    map.fitBounds(bounds, 72);
+  }, [fitToMarkers, isLoaded, markerSignature, markers, zoom]);
 
   // When offsets change (sidebar/header toggled) or map loads, force map to recalc size
   React.useEffect(() => {
@@ -229,17 +260,7 @@ export default function GoogleMapView({
             <Marker
               key={m.id}
               position={m.position}
-              label={{ text: m.label || m.id, color: "#ffffff", fontSize: "12px", fontWeight: "700" }}
-              icon={{
-                // access google safely at runtime
-                path: (typeof window !== "undefined" && (window as any).google)
-                  ? (window as any).google.maps.SymbolPath.BACKWARD_CLOSED_ARROW
-                  : 0,
-                scale: 6,
-                fillColor: m.color ? pinColors[m.color] : "#3b82f6",
-                fillOpacity: 1,
-                strokeWeight: 0,
-              }}
+              title={m.label || m.id}
               onClick={() => setActiveMarker(m.id)}
             />
           ))}

@@ -16,6 +16,7 @@ const AdminDashboardPage: React.FC = () => {
             { id: 'LRI2249', label: 'LRI2249', position: { lat: 34.072, lng: -118.28 }, color: 'red' },
             { id: 'LRI2348', label: 'LRI2348', position: { lat: 34.09, lng: -118.22 }, color: 'green' },
           ]}
+          fitToMarkers={true}
         />
       </Box>
     </>
