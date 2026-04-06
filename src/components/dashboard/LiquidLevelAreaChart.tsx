@@ -4,6 +4,8 @@ import ChartCard from './ChartCard';
 
 type Point = Record<string, any> & { name: string };
 
+type Timeframe = 'day' | 'week' | 'month';
+
 const formatTimestamp = (raw: unknown): string => {
   const s = String(raw || '').trim();
   if (!s) return '';
@@ -22,16 +24,22 @@ const formatTimestamp = (raw: unknown): string => {
   }
 };
 
-const formatTimeOnly = (raw: unknown): string => {
+const formatAxisLabel = (raw: unknown, timeframe: Timeframe): string => {
   const s = String(raw || '').trim();
   if (!s) return '';
   const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
   if (Number.isNaN(parsed.getTime())) return s;
   try {
+    if (timeframe === 'day') {
+      return new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(parsed);
+    }
     return new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      day: '2-digit',
+      month: 'short',
     }).format(parsed);
   } catch {
     return parsed.toLocaleTimeString();
@@ -43,7 +51,8 @@ const LiquidLevelAreaChart: React.FC<{
   controls?: React.ReactNode;
   title?: string;
   dataKey?: string;
-}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level' }) => {
+  timeframe?: Timeframe;
+}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', timeframe = 'month' }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={title} subtitle="Real-time" rightControls={controls}>
@@ -61,10 +70,11 @@ const LiquidLevelAreaChart: React.FC<{
             height={50}
             tickLine={false}
             axisLine={false}
-            interval={0}
-            angle={-35}
+            interval="preserveStartEnd"
+            minTickGap={16}
+            angle={timeframe === 'day' ? -25 : -20}
             textAnchor="end"
-            tickFormatter={(v: any) => formatTimeOnly(v)}
+            tickFormatter={(v: any) => formatAxisLabel(v, timeframe)}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip labelFormatter={(label: any) => formatTimestamp(label)} />

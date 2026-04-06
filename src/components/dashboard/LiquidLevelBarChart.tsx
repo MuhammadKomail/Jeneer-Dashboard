@@ -4,6 +4,8 @@ import ChartCard from './ChartCard';
 
 export type LiquidLevelPoint = { name: string; level: number };
 
+type Timeframe = 'day' | 'week' | 'month';
+
 const formatTimestamp = (raw: unknown): string => {
   const s = String(raw || '').trim();
   if (!s) return '';
@@ -23,16 +25,22 @@ const formatTimestamp = (raw: unknown): string => {
   }
 };
 
-const formatTimeOnly = (raw: unknown): string => {
+const formatAxisLabel = (raw: unknown, timeframe: Timeframe): string => {
   const s = String(raw || '').trim();
   if (!s) return '';
   const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
   if (Number.isNaN(parsed.getTime())) return s;
   try {
+    if (timeframe === 'day') {
+      return new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(parsed);
+    }
     return new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      day: '2-digit',
+      month: 'short',
     }).format(parsed);
   } catch {
     return parsed.toLocaleTimeString();
@@ -45,7 +53,8 @@ const LiquidLevelBarChart: React.FC<{
   title?: string;
   dataKey?: string;
   barColor?: string;
-}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', barColor = '#EA860A' }) => {
+  timeframe?: Timeframe;
+}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', barColor = '#EA860A', timeframe = 'month' }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={title} subtitle="" rightControls={controls}>
@@ -62,13 +71,12 @@ const LiquidLevelBarChart: React.FC<{
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            interval={0}
-            angle={-35}
+            interval="preserveStartEnd"
+            minTickGap={16}
+            angle={timeframe === 'day' ? -25 : -20}
             textAnchor="end"
             height={50}
-            tickFormatter={(v: any) => {
-              return formatTimeOnly(v);
-            }}
+            tickFormatter={(v: any) => formatAxisLabel(v, timeframe)}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip labelFormatter={(label: any) => formatTimestamp(label)} />
