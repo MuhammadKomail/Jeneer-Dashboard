@@ -252,7 +252,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   // API data for companies -> sites -> devices
-  type Device = { id: number; device_serial: string; geolocation?: { x: number; y: number } | [number, number] | null };
+  type Device = {
+    id: number;
+    device_serial: string;
+    geolocation?: { x: number; y: number } | [number, number] | null;
+    well_id?: string | number | null;
+    description?: string | null;
+    product?: string | null;
+  };
   type Site = { location_id: number; site_name: string; devices: Device[] };
   type Company = { company_id: number; company_name: string; sites: Site[] };
   const [apiCompanies, setApiCompanies] = useState<Company[] | null>(null);

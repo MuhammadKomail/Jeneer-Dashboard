@@ -104,11 +104,11 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
           const g: GallonsPoint[] = Array.isArray(json.gallons_pumped)
             ? sortByTimestamp(json.gallons_pumped.map((r: any) => ({ name: r.ts, gallons: Number(r.value) || 0 })))
             : [];
-          const c = Array.isArray(json.cycle_count)
-            ? sortByTimestamp(json.cycle_count.map((r: any) => ({ name: r.ts, cycleCount: Number(r.value) || 0 })))
+          const c: Array<{ name: string; cycleCount: number }> = Array.isArray(json.cycle_count)
+            ? sortByTimestamp(json.cycle_count.map((r: any) => ({ name: String(r?.ts ?? ''), cycleCount: Number(r?.value) || 0 })))
             : [];
-          const t = Array.isArray(json.timeouts)
-            ? sortByTimestamp(json.timeouts.map((r: any) => ({ name: r.ts, timeouts: Number(r.value) || 0 })))
+          const t: Array<{ name: string; timeouts: number }> = Array.isArray(json.timeouts)
+            ? sortByTimestamp(json.timeouts.map((r: any) => ({ name: String(r?.ts ?? ''), timeouts: Number(r?.value) || 0 })))
             : [];
           setGallons(g);
           setCycleCounts(c);
