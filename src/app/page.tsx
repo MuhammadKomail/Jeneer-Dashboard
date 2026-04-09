@@ -252,7 +252,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   // API data for companies -> sites -> devices
-  type Device = { id: number; device_serial: string; geolocation?: { x: number; y: number } | [number, number] | null };
+  type Device = { 
+    id: number; 
+    device_serial: string; 
+    well_id?: string;
+    description?: string;
+    product?: string;
+    geolocation?: { x: number; y: number } | [number, number] | null;
+  };
   type Site = { location_id: number; site_name: string; devices: Device[] };
   type Company = { company_id: number; company_name: string; sites: Site[] };
   const [apiCompanies, setApiCompanies] = useState<Company[] | null>(null);
@@ -294,21 +301,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         if (lng == null || lat == null) return null;
 
         // Create device-specific info popup
+        const device = d as any;
         const deviceInfo = (
           <div style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6, color: '#2f6b2f' }}>{d.device_serial || 'Device'}</div>
+            <div style={{ fontWeight: 800, marginBottom: 6, color: '#2f6b2f' }}>{device.device_serial || 'Device'}</div>
             <div style={{ fontSize: 13, color: '#111827', lineHeight: 1.6 }}>
               <div><strong>Site:</strong> {(site as any)?.site_name || '-'}</div>
-              <div><strong>Well ID:</strong> {d.well_id || '-'}</div>
-              <div><strong>Description:</strong> {d.description || '-'}</div>
-              <div><strong>Product:</strong> {d.product || '-'}</div>
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
+              <div><strong>Well ID:</strong> {device.well_id || '-'}</div>
+              <div><strong>Description:</strong> {device.description || '-'}</div>
+              <div><strong>Product:</strong> {device.product || '-'}</div>
+              {/* <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
                 <div><strong>Site Metrics (Last 24h):</strong></div>
                 <div>Pumped: {metrics?.pumped_last_24h_gal?.toLocaleString() || '-'} gal</div>
                 <div>Timeouts: {metrics?.timeouts_last_24h?.toLocaleString() || '-'}</div>
                 <div>Temperature: {metrics?.temperature_f || '-'} F</div>
                 <div>Vacuum: {metrics?.vacuum_inwc || '-'} inwc</div>
-              </div>
+              </div> */}
             </div>
           </div>
         );

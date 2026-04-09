@@ -14,12 +14,16 @@ type SettingRow = {
   id: string;
   ts: string;
   highAdc: number;
-  threshold: number;
   currentAdc: number;
   lowAdc: number;
-  airOnTime: number;
-  airTimeout: number;
-  delay: number;
+  hold: number;
+  minAir: number;
+  maxAir: number;
+  ledOn: number;
+  purge: number;
+  maxIdle: number;
+  rest: number;
+  thres: number;
   volPerCycle: number;
 };
 
@@ -51,18 +55,21 @@ const format2 = (n: number): string => {
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   id: String(i + 1),
   ts: `2025-06-1${i} 08:06:40`,
-  highAdc: 2800 + i,
-  threshold: 4000,
-  currentAdc: 2790 + i,
-  lowAdc: 2790 + i,
-  airOnTime: 7,
-  airTimeout: i % 4 === 0 ? 1 : 0,
-  delay: 5,
-  volPerCycle: 123.45,
+  highAdc: 3150,
+  currentAdc: 455,
+  lowAdc: 310,
+  hold: 1200,
+  minAir: 3,
+  maxAir: 15,
+  ledOn: 7,
+  purge: 10,
+  maxIdle: 0,
+  rest: 2,
+  thres: 1499,
+  volPerCycle: 0.3,
 }));
 
 const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
-  const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('30d');
   const router = useRouter();
   const pathname = usePathname();
   const [rows, setRows] = React.useState<SettingRow[] | null>(null);
@@ -71,7 +78,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   const [pageSize, setPageSize] = React.useState<number>(10);
   const [saving, setSaving] = React.useState(false);
   const [bulkEdit, setBulkEdit] = React.useState<{
-    field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle';
+    field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle';
     label: string;
     value: string;
   } | null>(null);
@@ -80,19 +87,23 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     return raw.map((r: any, idx: number) => {
       const id = String(r?.id ?? r?.setting_id ?? r?.settingId ?? r?.settings_id ?? r?.ts ?? r?.timestamp ?? idx);
       const ts = String(r?.ts ?? r?.timestamp ?? r?.created_at ?? '');
-      const highAdc = Number(r?.highAdc ?? r?.high_adc ?? r?.high_adc_reading ?? r?.high_adc_value ?? 0) || 0;
-      const threshold = Number(r?.threshold ?? r?.adc_threshold ?? r?.adcThreshold ?? 0) || 0;
-      const currentAdc = Number(r?.currentAdc ?? r?.current_adc ?? r?.current_adc_reading ?? 0) || 0;
-      const lowAdc = Number(r?.lowAdc ?? r?.low_adc ?? r?.low_adc_reading ?? r?.low_adc_value ?? 0) || 0;
-      const airOnTime = Number(r?.airOnTime ?? r?.air_on_time ?? r?.air_on ?? 0) || 0;
-      const airTimeout = Number(r?.airTimeout ?? r?.air_timeout ?? r?.air_flow_timeout ?? 0) || 0;
-      const delay = Number(r?.delay ?? r?.start_delay ?? 0) || 0;
-      const volPerCycle = Number(r?.volPerCycle ?? r?.vol_per_cycle ?? r?.vol_percycle ?? 0) || 0;
-      return { id, ts, highAdc, threshold, currentAdc, lowAdc, airOnTime, airTimeout, delay, volPerCycle };
+      const highAdc = Number(r?.highAdc ?? r?.high_adc ?? 0) || 0;
+      const currentAdc = Number(r?.currentAdc ?? r?.current_adc ?? 0) || 0;
+      const lowAdc = Number(r?.lowAdc ?? r?.low_adc ?? 0) || 0;
+      const hold = Number(r?.hold ?? 0) || 0;
+      const minAir = Number(r?.minAir ?? r?.min_air ?? 0) || 0;
+      const maxAir = Number(r?.maxAir ?? r?.max_air ?? 0) || 0;
+      const ledOn = Number(r?.ledOn ?? r?.led_on ?? 0) || 0;
+      const purge = Number(r?.purge ?? 0) || 0;
+      const maxIdle = Number(r?.maxIdle ?? r?.max_idle ?? 0) || 0;
+      const rest = Number(r?.rest ?? 0) || 0;
+      const thres = Number(r?.thres ?? r?.threshold ?? 0) || 0;
+      const volPerCycle = Number(r?.volPerCycle ?? r?.vol_per_cycle ?? 0) || 0;
+      return { id, ts, highAdc, currentAdc, lowAdc, hold, minAir, maxAir, ledOn, purge, maxIdle, rest, thres, volPerCycle };
     });
   }, []);
 
-  const startBulkEdit = (field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle', label: string) => {
+  const startBulkEdit = (field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle', label: string) => {
     const first = (rows && rows.length > 0) ? rows[0] : null;
     const initial = first ? String(first[field] ?? '') : '';
     setBulkEdit({ field, label, value: initial });
@@ -116,9 +127,8 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
       const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings/${encodeURIComponent(targetRowId)}`;
 
-      const body: any = { applyToAll: true };
-      const payloadKey = bulkEdit.field === 'volPerCycle' ? 'vol_per_cycle' : bulkEdit.field;
-      body[payloadKey] = nextVal;
+      const body: any = {};
+      body[bulkEdit.field] = nextVal;
 
       const res = await fetch(url, {
         method: 'PATCH',
@@ -147,7 +157,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     }
   };
 
-  const headerWithEdit = React.useCallback((label: string, field: 'threshold' | 'airOnTime' | 'airTimeout' | 'delay' | 'volPerCycle') => {
+  const headerWithEdit = React.useCallback((label: string, field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle') => {
     return (
       <div className="inline-flex items-center gap-2">
         <span>{label}</span>
@@ -170,12 +180,12 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   const columns: Column<SettingRow>[] = React.useMemo(() => [
     { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
     { key: 'highAdc', header: 'High ADC Reading' },
-    { key: 'threshold', header: headerWithEdit('ADC Threshold Setting', 'threshold') },
+    { key: 'thres', header: headerWithEdit('ADC Threshold Setting', 'thres') },
     { key: 'currentAdc', header: 'Current ADC' },
     { key: 'lowAdc', header: 'Low ADC Reading' },
-    { key: 'airOnTime', header: headerWithEdit('Air On Time', 'airOnTime') },
-    { key: 'airTimeout', header: headerWithEdit('Air Flow Timeout', 'airTimeout') },
-    { key: 'delay', header: headerWithEdit('Delay', 'delay') },
+    { key: 'minAir', header: headerWithEdit('Air On Time', 'minAir') },
+    { key: 'maxAir', header: headerWithEdit('Air Flow Timeout', 'maxAir') },
+    { key: 'rest', header: headerWithEdit('Delay', 'rest') },
     { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle'), render: (r) => format2(r.volPerCycle) },
   ], [headerWithEdit]);
 
@@ -185,7 +195,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     (async () => {
       try {
         const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
-        const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings?range=${range}&page=${page}&pageSize=${pageSize}`;
+        const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings?range=all&page=${page}&pageSize=${pageSize}`;
         const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
@@ -197,17 +207,17 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       } catch { if (!ignore) { setRows([]); setTotal(0); } }
     })();
     return () => { ignore = true; };
-  }, [deviceSerial, range, page, pageSize, normalizeRows]);
+  }, [deviceSerial, page, pageSize, normalizeRows]);
 
   const exportCsv = () => {
-    const header = ['Timestamp','High ADC Reading','ADC Threshold Setting','Current ADC','Low ADC Reading','Air On Time','Air Flow Timeout','Delay'];
-    const lines = (rows || fallbackRows).map(r => [r.ts, r.highAdc, r.threshold, r.currentAdc, r.lowAdc, r.airOnTime, r.airTimeout, r.delay].join(','));
+    const header = ['Timestamp','High ADC Reading','ADC Threshold Setting','Current ADC','Low ADC Reading','Air On Time','Air Flow Timeout','Delay','Vol Per Cycle'];
+    const lines = (rows || fallbackRows).map(r => [r.ts, r.highAdc, r.thres, r.currentAdc, r.lowAdc, r.minAir, r.maxAir, r.rest, r.volPerCycle].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pump_settings_${range}.csv`;
+    a.download = `pump_settings_all.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -217,15 +227,6 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
         <div className="text-base font-semibold">Jeneer FloatLes pump setting</div>
         <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
-          <select
-            value={range}
-            onChange={(e)=>setRange(e.target.value as any)}
-            className="px-3 py-1.5 bg-white border rounded-md text-sm text-gray-700"
-          >
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 1 Month</option>
-          </select>
           {/* Expand fullscreen */}
           <button
             type="button"
