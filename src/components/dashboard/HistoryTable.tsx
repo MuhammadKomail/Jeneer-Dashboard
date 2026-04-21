@@ -5,6 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 
 type HistoryRow = {
   ts: string;
+  highAdc: number;
+  currentAdc: number;
+  lowAdc: number;
   gallons: number;
   cycle: number;
   timeouts: number;
@@ -41,6 +44,9 @@ const format2 = (n: number): string => {
 
 const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
   ts: `2025-06-1${i} 08:06:40`,
+  highAdc: 1500 + (i % 5),
+  currentAdc: 1200 + (i % 7) * 3,
+  lowAdc: 900 + (i % 4),
   gallons: 2800 + (i % 7) * 15,
   cycle: 4000,
   timeouts: i % 9 === 0 ? 1 : 0,
@@ -52,6 +58,9 @@ const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
 
 const columns: Column<HistoryRow>[] = [
   { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
+  { key: 'highAdc', header: 'High ADC Reading' },
+  { key: 'currentAdc', header: 'Current ADC' },
+  { key: 'lowAdc', header: 'Low ADC Reading' },
   { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
   { key: 'cycle', header: 'Cycle' },
   { key: 'timeouts', header: 'Timeouts' },
@@ -78,8 +87,21 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && Array.isArray(json?.rows)) {
-          setRows(json.rows as HistoryRow[]);
-          setTotal(Number(json.total) || (json.rows as any[]).length);
+          const normalized = (json.rows as any[]).map((row) => ({
+            ts: String(row?.ts ?? row?.timestamp ?? row?.created_at ?? ''),
+            highAdc: Number(row?.highAdc ?? row?.high_adc ?? row?.high_adc_reading ?? 0) || 0,
+            currentAdc: Number(row?.currentAdc ?? row?.current_adc ?? row?.current_adc_reading ?? 0) || 0,
+            lowAdc: Number(row?.lowAdc ?? row?.low_adc ?? row?.low_adc_reading ?? 0) || 0,
+            gallons: Number(row?.gallons ?? 0) || 0,
+            cycle: Number(row?.cycle ?? 0) || 0,
+            timeouts: Number(row?.timeouts ?? 0) || 0,
+            totalGallons: Number(row?.totalGallons ?? row?.total_gallons ?? 0) || 0,
+            totalCycles: Number(row?.totalCycles ?? row?.total_cycles ?? 0) || 0,
+            totalTimeouts: Number(row?.totalTimeouts ?? row?.total_timeouts ?? 0) || 0,
+            battery: Number(row?.battery ?? 0) || 0,
+          }));
+          setRows(normalized as HistoryRow[]);
+          setTotal(Number(json.total) || normalized.length);
         } else {
           setRows([]); setTotal(0);
         }
@@ -89,8 +111,8 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
   }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
-    const header = ['Timestamp','Gallons','Cycle','Timeouts','Battery Voltage'];
-    const lines = rows.map(r => [r.ts, r.gallons, r.cycle, r.timeouts, r.battery].join(','));
+    const header = ['Timestamp','High ADC Reading','Current ADC','Low ADC Reading','Gallons','Cycle','Timeouts','Battery Voltage'];
+    const lines = rows.map(r => [r.ts, r.highAdc, r.currentAdc, r.lowAdc, r.gallons, r.cycle, r.timeouts, r.battery].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

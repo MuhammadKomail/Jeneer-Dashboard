@@ -13,9 +13,6 @@ import toast from 'react-hot-toast';
 type SettingRow = {
   id: string;
   ts: string;
-  highAdc: number;
-  currentAdc: number;
-  lowAdc: number;
   hold: number;
   minAir: number;
   maxAir: number;
@@ -55,9 +52,6 @@ const format2 = (n: number): string => {
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   id: String(i + 1),
   ts: `2025-06-1${i} 08:06:40`,
-  highAdc: 3150,
-  currentAdc: 455,
-  lowAdc: 310,
   hold: 1200,
   minAir: 3,
   maxAir: 15,
@@ -87,9 +81,6 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     return raw.map((r: any, idx: number) => {
       const id = String(r?.id ?? r?.setting_id ?? r?.settingId ?? r?.settings_id ?? r?.ts ?? r?.timestamp ?? idx);
       const ts = String(r?.ts ?? r?.timestamp ?? r?.created_at ?? '');
-      const highAdc = Number(r?.highAdc ?? r?.high_adc ?? 0) || 0;
-      const currentAdc = Number(r?.currentAdc ?? r?.current_adc ?? 0) || 0;
-      const lowAdc = Number(r?.lowAdc ?? r?.low_adc ?? 0) || 0;
       const hold = Number(r?.hold ?? 0) || 0;
       const minAir = Number(r?.minAir ?? r?.min_air ?? 0) || 0;
       const maxAir = Number(r?.maxAir ?? r?.max_air ?? 0) || 0;
@@ -99,7 +90,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       const rest = Number(r?.rest ?? 0) || 0;
       const thres = Number(r?.thres ?? r?.threshold ?? 0) || 0;
       const volPerCycle = Number(r?.volPerCycle ?? r?.vol_per_cycle ?? 0) || 0;
-      return { id, ts, highAdc, currentAdc, lowAdc, hold, minAir, maxAir, ledOn, purge, maxIdle, rest, thres, volPerCycle };
+      return { id, ts, hold, minAir, maxAir, ledOn, purge, maxIdle, rest, thres, volPerCycle };
     });
   }, []);
 
@@ -179,10 +170,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
   const columns: Column<SettingRow>[] = React.useMemo(() => [
     { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
-    { key: 'highAdc', header: 'High ADC Reading' },
     { key: 'thres', header: headerWithEdit('ADC Threshold Setting', 'thres') },
-    { key: 'currentAdc', header: 'Current ADC' },
-    { key: 'lowAdc', header: 'Low ADC Reading' },
     { key: 'minAir', header: headerWithEdit('Air On Time', 'minAir') },
     { key: 'maxAir', header: headerWithEdit('Air Flow Timeout', 'maxAir') },
     { key: 'rest', header: headerWithEdit('Delay', 'rest') },
@@ -210,8 +198,8 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   }, [deviceSerial, page, pageSize, normalizeRows]);
 
   const exportCsv = () => {
-    const header = ['Timestamp','High ADC Reading','ADC Threshold Setting','Current ADC','Low ADC Reading','Air On Time','Air Flow Timeout','Delay','Vol Per Cycle'];
-    const lines = (rows || fallbackRows).map(r => [r.ts, r.highAdc, r.thres, r.currentAdc, r.lowAdc, r.minAir, r.maxAir, r.rest, r.volPerCycle].join(','));
+    const header = ['Timestamp','ADC Threshold Setting','Air On Time','Air Flow Timeout','Delay','Vol Per Cycle'];
+    const lines = (rows || fallbackRows).map(r => [r.ts, r.thres, r.minAir, r.maxAir, r.rest, r.volPerCycle].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
