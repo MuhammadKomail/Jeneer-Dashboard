@@ -49,6 +49,14 @@ const format2 = (n: number): string => {
   return Number.isInteger(x) ? String(x) : x.toFixed(2);
 };
 
+const formatSecondsToHM = (seconds: number): string => {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s < 0) return '-';
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  return `${hours}:${String(minutes).padStart(2, '0')}`;
+};
+
 const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   id: String(i + 1),
   ts: `2025-06-1${i} 08:06:40`,
@@ -173,7 +181,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     { key: 'thres', header: headerWithEdit('ADC Threshold Setting', 'thres') },
     { key: 'minAir', header: headerWithEdit('Air On Time', 'minAir') },
     { key: 'maxAir', header: headerWithEdit('Air Flow Timeout', 'maxAir') },
-    { key: 'maxIdle', header: headerWithEdit('Max Idle Time', 'maxIdle') },
+    { key: 'maxIdle', header: headerWithEdit('Max Idle Time', 'maxIdle'), render: (r) => formatSecondsToHM(r.maxIdle) },
     { key: 'rest', header: headerWithEdit('Delay', 'rest') },
     { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle'), render: (r) => format2(r.volPerCycle) },
   ], [headerWithEdit]);
@@ -200,7 +208,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
   const exportCsv = () => {
     const header = ['Timestamp','ADC Threshold Setting','Air On Time','Air Flow Timeout','Max Idle Time','Delay','Vol Per Cycle'];
-    const lines = (rows || fallbackRows).map(r => [r.ts, r.thres, r.minAir, r.maxAir, r.maxIdle, r.rest, r.volPerCycle].join(','));
+    const lines = (rows || fallbackRows).map(r => [r.ts, r.thres, r.minAir, r.maxAir, formatSecondsToHM(r.maxIdle), r.rest, r.volPerCycle].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
