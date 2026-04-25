@@ -5,7 +5,7 @@ import {
     authenticatedRoutes
 } from './utils/routes/routes';
 
-export function middleware(req: NextRequest): NextResponse | void {
+export function proxy(req: NextRequest): NextResponse | void {
     const isUserLoggedIn = req.cookies.get('UserAuthenticated')?.value;
     const { pathname } = req.nextUrl;
     const jwt = req.cookies.get('AuthToken')?.value;

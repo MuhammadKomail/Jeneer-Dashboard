@@ -2,12 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   basePath: "/admin", // Add the /admin basePath
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   /* Add other config options here if needed */
   images: {
-    domains: ["as2.ftcdn.net", "ajeek-dev.s3.me-central-1.amazonaws.com", "www.gmtaps.com", "4kwallpapers.com"],
+    remotePatterns: [
+      { protocol: "https", hostname: "as2.ftcdn.net" },
+      { protocol: "https", hostname: "ajeek-dev.s3.me-central-1.amazonaws.com" },
+      { protocol: "https", hostname: "www.gmtaps.com" },
+      { protocol: "https", hostname: "4kwallpapers.com" },
+    ],
   },
   webpack: (config, { dev, isServer }) => {
     // Optimize webpack cache to reduce serialization warnings

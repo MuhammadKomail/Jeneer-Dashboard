@@ -50,7 +50,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>Jeneer - Admin</title>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

@@ -34,12 +34,12 @@ function createReconnectingEventSource(
 
 const NotificationListener: React.FC = () => {
   const { user } = useAppSelector((state: RootState) => state.authStates);
-  const cleanupRef = useRef<() => void>();   // holds the current close fn
+  const cleanupRef = useRef<(() => void) | null>(null);   // holds the current close fn
 
   useEffect(() => {
     // Tear down the previous stream (if any) before creating a new one
     cleanupRef.current?.();
-    cleanupRef.current = undefined;
+    cleanupRef.current = null;
 
     if (!user?.userId) return;        // nothing to listen to yet
 
@@ -68,7 +68,7 @@ const NotificationListener: React.FC = () => {
 
     return () => {
       cleanupRef.current?.();
-      cleanupRef.current = undefined;
+      cleanupRef.current = null;
       console.log('EventSource connection closed');
     };
   }, [user?.userId]);  // only re‑run when the ID actually changes
