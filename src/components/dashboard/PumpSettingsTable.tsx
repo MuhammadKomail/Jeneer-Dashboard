@@ -9,6 +9,12 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import { usePathname, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import {
+  inputPropsForPumpTimeField,
+  isPumpTimeField,
+  parsePumpTimeSeconds,
+  PUMP_TIME_LIMITS,
+} from '@/utils/pump-setting-limits';
 
 type SettingRow = {
   id: string;
@@ -110,10 +116,20 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
 
   const saveBulkEdit = async () => {
     if (!bulkEdit || !deviceSerial) return;
-    const nextVal = Number(bulkEdit.value);
-    if (!Number.isFinite(nextVal)) {
-      toast.error('Invalid number');
-      return;
+    let nextVal: number;
+    if (isPumpTimeField(bulkEdit.field)) {
+      const parsed = parsePumpTimeSeconds(bulkEdit.field, bulkEdit.value);
+      if (parsed.ok === false) {
+        toast.error(parsed.error);
+        return;
+      }
+      nextVal = parsed.value;
+    } else {
+      nextVal = Number(bulkEdit.value);
+      if (!Number.isFinite(nextVal)) {
+        toast.error('Invalid number');
+        return;
+      }
     }
 
     const targetRowId = (() => {
@@ -276,6 +292,16 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
             type="number"
             value={bulkEdit?.value ?? ''}
             onChange={(e) => setBulkEdit((p) => (p ? { ...p, value: e.target.value } : p))}
+            helperText={
+              bulkEdit && isPumpTimeField(bulkEdit.field)
+                ? `${PUMP_TIME_LIMITS[bulkEdit.field].min}–${PUMP_TIME_LIMITS[bulkEdit.field].max} seconds (whole numbers only)`
+                : undefined
+            }
+            inputProps={
+              bulkEdit && isPumpTimeField(bulkEdit.field)
+                ? inputPropsForPumpTimeField(bulkEdit.field)
+                : undefined
+            }
             fullWidth
             size="small"
             margin="dense"

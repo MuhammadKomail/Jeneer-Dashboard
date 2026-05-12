@@ -8,6 +8,12 @@ import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import toast from 'react-hot-toast';
+import {
+  inputPropsForPumpTimeField,
+  isPumpTimeField,
+  parsePumpTimeSeconds,
+  PUMP_TIME_LIMITS,
+} from '@/utils/pump-setting-limits';
 
 type DeviceSettingsRow = {
   setting_id: number | string;
@@ -200,10 +206,20 @@ const DeviceSettingsPanel: React.FC<{ deviceSerial?: string }> = ({ deviceSerial
     const changes: Partial<Record<SettingFieldKey, number>> = {};
 
     for (const field of editableFields) {
-      const nextValue = Number(draft[field.key]);
-      if (!Number.isFinite(nextValue)) {
-        toast.error(`${field.label} must be a valid number`);
-        return;
+      let nextValue: number;
+      if (isPumpTimeField(field.key)) {
+        const parsed = parsePumpTimeSeconds(field.key, draft[field.key]);
+        if (parsed.ok === false) {
+          toast.error(parsed.error);
+          return;
+        }
+        nextValue = parsed.value;
+      } else {
+        nextValue = Number(draft[field.key]);
+        if (!Number.isFinite(nextValue)) {
+          toast.error(`${field.label} must be a valid number`);
+          return;
+        }
       }
 
       if (nextValue !== settings[field.key]) {
@@ -328,7 +344,18 @@ const DeviceSettingsPanel: React.FC<{ deviceSerial?: string }> = ({ deviceSerial
                     value={draft[field.key] ?? ''}
                     onChange={(event) => handleFieldChange(field.key, event.target.value)}
                     disabled={disabled}
-                    inputProps={field.step ? { step: field.step } : undefined}
+                    inputProps={
+                      isPumpTimeField(field.key)
+                        ? inputPropsForPumpTimeField(field.key)
+                        : field.step
+                          ? { step: field.step }
+                          : undefined
+                    }
+                    helperText={
+                      isPumpTimeField(field.key)
+                        ? `Allowed: ${PUMP_TIME_LIMITS[field.key].min}–${PUMP_TIME_LIMITS[field.key].max} sec (integers)`
+                        : undefined
+                    }
                   />
                 </Grid>
               ))}
