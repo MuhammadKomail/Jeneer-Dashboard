@@ -8,6 +8,7 @@ import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import toast from 'react-hot-toast';
+import { formatPumpTimestamp } from '@/utils/datetime';
 import {
   inputPropsForPumpTimeField,
   isPumpTimeField,
@@ -65,25 +66,6 @@ const getToken = (): string | null => {
     return match ? decodeURIComponent(match[1]) : null;
   } catch {
     return null;
-  }
-};
-
-const formatTimestamp = (raw: string): string => {
-  const s = String(raw || '').trim();
-  if (!s) return '-';
-  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
-  if (Number.isNaN(parsed.getTime())) return s;
-  try {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(parsed);
-  } catch {
-    return parsed.toLocaleString();
   }
 };
 
@@ -276,7 +258,7 @@ const DeviceSettingsPanel: React.FC<{ deviceSerial?: string }> = ({ deviceSerial
           </Typography>
           {settings?.ts ? (
             <Typography variant="caption" color="text.secondary">
-              Last synced: {formatTimestamp(settings.ts)}
+              Last synced: {formatPumpTimestamp(settings.ts)}
             </Typography>
           ) : null}
         </Box>

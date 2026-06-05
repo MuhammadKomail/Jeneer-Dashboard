@@ -2,6 +2,7 @@ import React from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import DataTable, { Column } from '@/components/table/DataTable';
 import { usePathname, useRouter } from 'next/navigation';
+import { formatPumpTimestamp } from '@/utils/datetime';
 
 type HistoryRow = {
   ts: string;
@@ -15,25 +16,6 @@ type HistoryRow = {
   totalCycles: number;
   totalTimeouts: number;
   battery: number;
-};
-
-const formatTimestamp = (raw: string): string => {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
-  if (Number.isNaN(parsed.getTime())) return s;
-  try {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(parsed);
-  } catch {
-    return parsed.toLocaleString();
-  }
 };
 
 const format2 = (n: number): string => {
@@ -57,7 +39,7 @@ const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
 }));
 
 const columns: Column<HistoryRow>[] = [
-  { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
+  { key: 'ts', header: 'Timestamp', render: (r) => formatPumpTimestamp(r.ts) },
   { key: 'highAdc', header: 'High ADC Reading' },
   { key: 'currentAdc', header: 'Current ADC' },
   { key: 'lowAdc', header: 'Low ADC Reading' },

@@ -12,6 +12,7 @@ import LiquidLevelBarChart from './LiquidLevelBarChart';
 import TemperatureLineChart from './TemperatureLineChart';
 import HistoryTable from './HistoryTable';
 import PumpSettingsTable from './PumpSettingsTable';
+import { formatUtcAsEastern, parsePumpTimestampMs } from '@/utils/datetime';
 
 type Props = { deviceSerial: string };
 
@@ -26,24 +27,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
   const days = effectiveTimeframe === 'day' ? 1 : effectiveTimeframe === 'week' ? 7 : 30;
 
   const formatRangeDate = React.useCallback((raw: string, includeTime: boolean) => {
-    const parsed = new Date(raw);
-    if (Number.isNaN(parsed.getTime())) return raw;
-    try {
-      return new Intl.DateTimeFormat('en-GB', includeTime ? {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      } : {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }).format(parsed);
-    } catch {
-      return parsed.toLocaleString();
-    }
+    return formatUtcAsEastern(raw, includeTime);
   }, []);
 
   const rangeLabel = React.useMemo(() => {
@@ -53,13 +37,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
   }, [dateRange, effectiveTimeframe, formatRangeDate]);
 
   const sortByTimestamp = <T extends { name: string }>(rows: T[]): T[] => {
-    const toTime = (s: string): number => {
-      const v = String(s || '').trim();
-      const d = new Date(v.includes('T') ? v : v.replace(' ', 'T'));
-      const t = d.getTime();
-      return Number.isNaN(t) ? 0 : t;
-    };
-    return [...rows].sort((a, b) => toTime(a.name) - toTime(b.name));
+    return [...rows].sort((a, b) => parsePumpTimestampMs(a.name) - parsePumpTimestampMs(b.name));
   };
 
   const [gallons, setGallons] = React.useState<GallonsPoint[] | null>(null);

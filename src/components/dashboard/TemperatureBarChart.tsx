@@ -1,6 +1,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ChartCard from './ChartCard';
+import { formatPumpAxisLabel } from '@/utils/datetime';
 
 export type TemperaturePoint = { name: string; temp: number };
 
@@ -22,10 +23,7 @@ const TemperatureBarChart: React.FC<{ data?: TemperaturePoint[]; controls?: Reac
             tickLine={false}
             axisLine={false}
             interval={0}
-            tickFormatter={(v: any) => {
-              const d = new Date(String(v));
-              return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
-            }}
+            tickFormatter={(v: any) => formatPumpAxisLabel(v, 'month')}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <Tooltip />

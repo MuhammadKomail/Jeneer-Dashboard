@@ -8,6 +8,7 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import { usePathname, useRouter } from 'next/navigation';
+import { formatPumpTimestamp } from '@/utils/datetime';
 import toast from 'react-hot-toast';
 import {
   inputPropsForPumpTimeField,
@@ -28,25 +29,6 @@ type SettingRow = {
   rest: number;
   thres: number;
   volPerCycle: number;
-};
-
-const formatTimestamp = (raw: string): string => {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  const parsed = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
-  if (Number.isNaN(parsed.getTime())) return s;
-  try {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(parsed);
-  } catch {
-    return parsed.toLocaleString();
-  }
 };
 
 const format2 = (n: number): string => {
@@ -193,7 +175,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
   }, [deviceSerial, saving, startBulkEdit]);
 
   const columns: Column<SettingRow>[] = React.useMemo(() => [
-    { key: 'ts', header: 'Timestamp', render: (r) => formatTimestamp(r.ts) },
+    { key: 'ts', header: 'Timestamp', render: (r) => formatPumpTimestamp(r.ts) },
     { key: 'thres', header: headerWithEdit('ADC Threshold Setting', 'thres') },
     { key: 'minAir', header: headerWithEdit('Air On Time', 'minAir') },
     { key: 'maxAir', header: headerWithEdit('Air Flow Timeout', 'maxAir') },
