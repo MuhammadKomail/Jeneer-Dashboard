@@ -138,6 +138,18 @@ const geolocationToLatLng = (raw: any): { lat: number; lng: number } | null => {
   return { lat, lng };
 };
 
+const parseGeoPreviewInput = (value: string): { lat: number; lng: number } | null => {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  const parts = cleaned.split(',').map((x) => x.trim());
+  if (parts.length !== 2) return null;
+  const lat = Number(parts[0]);
+  const lng = Number(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+};
+
 export default function SiteManagementPage() {
   const [query, setQuery] = useState("");
   const [company, setCompany] = useState<string>("");
@@ -753,7 +765,20 @@ export default function SiteManagementPage() {
                     <input value={productI} onChange={(e) => setProductI(e.target.value)} placeholder="Product" className="w-full border rounded-md px-3 py-2 text-sm" />
                     <input value={descriptionI} onChange={(e) => setDescriptionI(e.target.value)} placeholder="Description" className="w-full border rounded-md px-3 py-2 text-sm" />
                     <input value={wellIdI} onChange={(e) => setWellIdI(e.target.value)} placeholder="Well ID" className="w-full border rounded-md px-3 py-2 text-sm" />
-                    <input value={geoPreview} readOnly placeholder="Lat,Lng" className="w-full border rounded-md px-3 py-2 text-xs text-gray-700 bg-gray-100" />
+                    <input
+                      value={geoPreview}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setGeoPreview(v);
+                        const ll = parseGeoPreviewInput(v);
+                        if (ll) {
+                          setLatI(ll.lat);
+                          setLngI(ll.lng);
+                        }
+                      }}
+                      placeholder="Lat,Lng"
+                      className="w-full border rounded-md px-3 py-2 text-xs text-gray-700"
+                    />
                     <button type="button" onClick={() => setMapOpen(true)} className="px-2 py-2 rounded-md border text-xs">Map</button>
                   </div>
                   <button
@@ -966,11 +991,20 @@ export default function SiteManagementPage() {
                       />
 
                       <input
-                        value={geolocationToPreview(d.geolocation)}
-                        readOnly
+                        key={`geo-${idx}-${geolocationToPreview(d.geolocation)}`}
+                        defaultValue={geolocationToPreview(d.geolocation)}
                         disabled={!!d.markedDelete}
+                        onBlur={(e) => {
+                          const ll = parseGeoPreviewInput(e.target.value);
+                          if (!ll) return;
+                          setEditDevices((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, geolocation: `(${ll.lng},${ll.lat})` } : x,
+                            ),
+                          );
+                        }}
                         placeholder="Lat,Lng"
-                        className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700 disabled:bg-gray-50 disabled:text-gray-500"
+                        className="w-full border rounded-md px-3 py-2 text-sm text-gray-700 disabled:bg-gray-50 disabled:text-gray-500"
                       />
                       <button
                         type="button"
@@ -1000,7 +1034,20 @@ export default function SiteManagementPage() {
                   <input value={editNewProduct} onChange={(e) => setEditNewProduct(e.target.value)} placeholder="Product" className="w-full border rounded-md px-3 py-2 text-sm" />
                   <input value={editNewDescription} onChange={(e) => setEditNewDescription(e.target.value)} placeholder="Description" className="w-full border rounded-md px-3 py-2 text-sm" />
                   <input value={editNewWellId} onChange={(e) => setEditNewWellId(e.target.value)} placeholder="Well ID" className="w-full border rounded-md px-3 py-2 text-sm" />
-                  <input value={editNewGeoPreview} readOnly placeholder="Lat,Lng" className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700" />
+                  <input
+                    value={editNewGeoPreview}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditNewGeoPreview(v);
+                      const ll = parseGeoPreviewInput(v);
+                      if (ll) {
+                        setEditNewLat(ll.lat);
+                        setEditNewLng(ll.lng);
+                      }
+                    }}
+                    placeholder="Lat,Lng"
+                    className="w-full border rounded-md px-3 py-2 text-sm text-gray-700"
+                  />
                   <button
                     type="button"
                     onClick={() => {
