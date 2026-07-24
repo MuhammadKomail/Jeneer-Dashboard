@@ -300,14 +300,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         }
         if (lng == null || lat == null) return null;
 
-        // Create device-specific info popup
+        // Create device-specific info popup (customer-facing: Well ID, not Board #)
         const device = d as any;
+        const wellLabel = String(device.well_id || '').trim() || 'Unassigned';
         const deviceInfo = (
           <div style={{ minWidth: 220 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6, color: '#2f6b2f' }}>{device.device_serial || 'Device'}</div>
+            <div style={{ fontWeight: 800, marginBottom: 6, color: '#2f6b2f' }}>{wellLabel}</div>
             <div style={{ fontSize: 13, color: '#111827', lineHeight: 1.6 }}>
               <div><strong>Site:</strong> {(site as any)?.site_name || '-'}</div>
-              <div><strong>Well ID:</strong> {device.well_id || '-'}</div>
+              <div><strong>Well ID:</strong> {wellLabel}</div>
               <div><strong>Description:</strong> {device.description || '-'}</div>
               <div><strong>Product:</strong> {device.product || '-'}</div>
               {/* <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
@@ -323,7 +324,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
         return {
           id: String(d.id || d.device_serial || `${lat},${lng}`),
-          label: d.device_serial,
+          label: wellLabel,
           position: { lat, lng },
           color: 'green' as const,
           info: deviceInfo,
@@ -332,16 +333,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       .filter(Boolean) as MapMarker[];
   }, [expandedSite, apiCompanies]);
 
-  // Build sidebar items from API or fallback static data
+  // Sidebar wells: label = Well ID (customer), key = device_serial (API/internal)
+  type SidebarWell = { key: string; label: string };
   const dashboardSites = useMemo(() => {
     if (apiCompanies && apiCompanies.length) {
-      const groups: { site: string; wells: string[]; company_id: number }[] = [];
+      const groups: { site: string; wells: SidebarWell[]; company_id: number }[] = [];
       for (const comp of apiCompanies) {
         for (const s of comp.sites || []) {
           const label = `${s.site_name} (${comp.company_name})`;
-          const wells = [
-            'Wellfield Overview',
-            ...((s.devices || []).map((d) => d.device_serial).filter(Boolean)),
+          const deviceWells = (s.devices || [])
+            .filter((d) => d.device_serial)
+            .map((d) => ({
+              key: d.device_serial,
+              label: String(d.well_id || '').trim() || 'Unassigned',
+            }));
+          const wells: SidebarWell[] = [
+            { key: 'Wellfield Overview', label: 'Wellfield Overview' },
+            ...deviceWells,
           ];
           groups.push({ site: label, wells, company_id: comp.company_id });
         }
@@ -350,6 +358,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     }
     // No fallback: keep empty until API returns
     return [];
+  }, [apiCompanies]);
+
+  const deviceLabelBySerial = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const comp of apiCompanies || []) {
+      for (const s of comp.sites || []) {
+        for (const d of s.devices || []) {
+          if (!d.device_serial) continue;
+          map[d.device_serial] = String(d.well_id || '').trim() || 'Unassigned';
+        }
+      }
+    }
+    return map;
   }, [apiCompanies]);
 
   // Dashboard default selection: run once when we have data (API or fallback)
@@ -639,9 +660,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                         <Collapse in={expanded} timeout="auto" unmountOnExit>
                           <List component="div" disablePadding>
                             {group.wells.map((well) => {
-                              const id = `${group.site}__${well}`;
+                              const id = `${group.site}__${well.key}`;
                               const selected = selectedWell === id;
-                              const compactLabel = well;
+                              const compactLabel = well.label;
                               return (
                                 <ListItem key={id} disablePadding sx={{ px: open ? 2 : 0, py: open ? 0.25 : 0.125 }}>
                                   <ListItemButton
@@ -762,9 +783,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             // Dashboard specific breadcrumb based on selection
             if (current?.href === '/dashboard') {
               if (selectedWell) {
-                const [site, well] = selectedWell.split('__');
-                title = well || title;
-                trail = [site, well];
+                const [site, wellKey] = selectedWell.split('__');
+                const group = dashboardSites.find((g) => g.site === site);
+                const wellItem = group?.wells.find((w) => w.key === wellKey);
+                const wellLabel = wellItem?.label || wellKey;
+                title = wellLabel || title;
+                trail = [site, wellLabel];
               } else if (expandedSite) {
                 title = expandedSite;
                 trail = [expandedSite];
@@ -814,9 +838,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                       if (well === 'Wellfield Overview') {
                         const group = dashboardSites.find(g => selectedWell?.startsWith(`${g.site}__`));
                         const companyId = group?.company_id || 0;
-                        return <Overview companyId={companyId} />;
+                        return <Overview companyId={companyId} deviceLabels={deviceLabelBySerial} />;
                       }
-                      return <DeviceOverview deviceSerial={well} />;
+                      const siteKey = selectedWell ? selectedWell.split('__')[0] : null;
+                      const group = dashboardSites.find((g) => g.site === siteKey);
+                      const wellItem = group?.wells.find((w) => w.key === well);
+                      const wellLabel = wellItem?.label;
+                      return <DeviceOverview deviceSerial={well} displayName={wellLabel} />;
                     }
                     // Parent site clicked (no specific well selected): show map with all devices for that site
                     if (expandedSite) {

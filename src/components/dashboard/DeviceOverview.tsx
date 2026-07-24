@@ -14,9 +14,10 @@ import HistoryTable from './HistoryTable';
 import PumpSettingsTable from './PumpSettingsTable';
 import { formatUtcAsEastern, parsePumpTimestampMs } from '@/utils/datetime';
 
-type Props = { deviceSerial: string };
+type Props = { deviceSerial: string; displayName?: string };
 
-const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
+const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
+  const wellLabel = (displayName && displayName.trim()) || deviceSerial;
   const [timeframe, setTimeframe] = React.useState<'day' | 'week' | 'month' | ''>('');
   const effectiveTimeframe: 'day' | 'week' | 'month' = timeframe === 'day' || timeframe === 'week' || timeframe === 'month' ? timeframe : 'month';
   const [gallonsChartType, setGallonsChartType] = React.useState<'bar' | 'trend'>('bar');
@@ -179,14 +180,14 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial }) => {
           {gallonsChartType === 'bar' ? (
             <GallonsBarChart
               data={gallons || undefined}
-              title={`Gallons Pumped (${deviceSerial})`}
+              title={`Gallons Pumped (${wellLabel})`}
               timeframe={effectiveTimeframe}
               controls={chartTypeControl(gallonsChartType, setGallonsChartType)}
             />
           ) : (
             <LiquidLevelAreaChart
               data={gallons || undefined}
-              title={`Gallons Pumped (${deviceSerial})`}
+              title={`Gallons Pumped (${wellLabel})`}
               dataKey="gallons"
               timeframe={effectiveTimeframe}
               controls={chartTypeControl(gallonsChartType, setGallonsChartType)}

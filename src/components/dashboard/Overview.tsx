@@ -4,13 +4,18 @@ import Grid from '@mui/material/Grid';
 import GallonsBarChart, { GallonsPoint } from './GallonsBarChart';
 import LiquidLevelBarChart from './LiquidLevelBarChart';
 
-type Props = { companyId: number };
+type Props = { companyId: number; deviceLabels?: Record<string, string> };
 
-const Overview: React.FC<Props> = ({ companyId }) => {
+const Overview: React.FC<Props> = ({ companyId, deviceLabels }) => {
   const [gallons, setGallons] = React.useState<GallonsPoint[] | null>(null);
   const [cycleCounts, setCycleCounts] = React.useState<Array<{ name: string; cycleCount: number }> | null>(null);
   const [timeouts, setTimeouts] = React.useState<Array<{ name: string; timeouts: number }> | null>(null);
   const days = 365;
+
+  const labelFor = React.useCallback((serial: string) => {
+    const mapped = deviceLabels?.[serial];
+    return (mapped && mapped.trim()) || serial;
+  }, [deviceLabels]);
 
   React.useEffect(() => {
     let ignore = false;
@@ -36,7 +41,7 @@ const Overview: React.FC<Props> = ({ companyId }) => {
                   const v = Number(r?.value) || 0;
                   totals.set(key, (totals.get(key) ?? 0) + v);
                 }
-                return Array.from(totals.entries()).map(([name, gallons]) => ({ name, gallons }));
+                return Array.from(totals.entries()).map(([serial, gallons]) => ({ name: labelFor(serial), gallons }));
               })()
             : [];
           const c = Array.isArray(json.cycle_count)
@@ -48,7 +53,7 @@ const Overview: React.FC<Props> = ({ companyId }) => {
                   const v = Number(r?.value) || 0;
                   totals.set(key, (totals.get(key) ?? 0) + v);
                 }
-                return Array.from(totals.entries()).map(([name, cycleCount]) => ({ name, cycleCount }));
+                return Array.from(totals.entries()).map(([serial, cycleCount]) => ({ name: labelFor(serial), cycleCount }));
               })()
             : [];
           const t = Array.isArray(json.timeouts)
@@ -60,7 +65,7 @@ const Overview: React.FC<Props> = ({ companyId }) => {
                   const v = Number(r?.value) || 0;
                   totals.set(key, (totals.get(key) ?? 0) + v);
                 }
-                return Array.from(totals.entries()).map(([name, timeouts]) => ({ name, timeouts }));
+                return Array.from(totals.entries()).map(([serial, timeouts]) => ({ name: labelFor(serial), timeouts }));
               })()
             : [];
           setGallons(g);
@@ -80,7 +85,7 @@ const Overview: React.FC<Props> = ({ companyId }) => {
       }
     })();
     return () => { ignore = true; };
-  }, [companyId, days]);
+  }, [companyId, days, labelFor]);
 
   const loading = gallons === null || cycleCounts === null || timeouts === null;
 
