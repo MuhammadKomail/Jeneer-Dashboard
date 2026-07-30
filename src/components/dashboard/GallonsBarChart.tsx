@@ -1,7 +1,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ChartCard from './ChartCard';
-import { formatPumpAxisLabel, formatPumpTimestamp } from '@/utils/datetime';
+import { formatNumber, formatPumpAxisLabel, formatPumpTimestamp } from '@/utils/datetime';
 
 export type GallonsPoint = { name: string; gallons: number };
 
@@ -33,7 +33,10 @@ const GallonsBarChart: React.FC<{ data?: GallonsPoint[]; title?: string; control
             tickFormatter={(v: any) => formatPumpAxisLabel(v, timeframe)}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-          <Tooltip labelFormatter={(label: any) => formatPumpTimestamp(label)} />
+          <Tooltip
+            labelFormatter={(label: any) => formatPumpTimestamp(label)}
+            formatter={(value) => [formatNumber(Number(value)), 'gallons']}
+          />
           <Bar dataKey="gallons" fill="#3BA049" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

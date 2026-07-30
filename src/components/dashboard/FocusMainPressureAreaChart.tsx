@@ -1,6 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ChartCard from './ChartCard';
+import { formatPumpTimestamp } from '@/utils/datetime';
 
 type Point = { name: string; pressure: number };
 
@@ -24,7 +25,7 @@ const FocusMainPressureAreaChart: React.FC<{ data?: Point[]; controls?: React.Re
             axisLine={false}
           />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-          <Tooltip />
+          <Tooltip labelFormatter={(label: any) => formatPumpTimestamp(label)} />
           <Area type="monotone" dataKey="pressure" stroke="#F59E0B" fill="#FDE68A" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>

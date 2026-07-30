@@ -1,6 +1,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ChartCard from './ChartCard';
+import { formatPumpTimestamp } from '@/utils/datetime';
 
 export type PressurePoint = { name: string; pressure: number };
 
@@ -18,7 +19,7 @@ const FocusMainPressureBarChart: React.FC<{ data?: PressurePoint[]; controls?: R
         <BarChart data={data}>
           <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
           <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-          <Tooltip />
+          <Tooltip labelFormatter={(label: any) => formatPumpTimestamp(label)} />
           <Bar dataKey="pressure" fill="#EA860A" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
