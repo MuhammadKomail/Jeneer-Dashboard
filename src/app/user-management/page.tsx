@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import DataTable, { Column } from "@/components/table/DataTable";
 import toast from "react-hot-toast";
+import { ADDON_KEYS, ADDON_LABELS, AddonKey, normalizeAddons } from "@/utils/addons";
 
 type ApiUser = {
   id: number;
@@ -18,6 +19,7 @@ type ApiUser = {
   is_current_user: boolean;
   created_at?: string;
   updated_at?: string;
+  addons?: string[];
 };
 
 type UsersListResponse = {
@@ -72,6 +74,7 @@ type UserRow = {
   siteName: string;
   siteId: number | null;
   isCurrentUser: boolean;
+  addons: AddonKey[];
 };
 
 export default function UserManagementPage() {
@@ -112,6 +115,7 @@ export default function UserManagementPage() {
   const [companyI, setCompanyI] = useState("");
   const [siteI, setSiteI] = useState("");
   const [passwordI, setPasswordI] = useState("");
+  const [addonsI, setAddonsI] = useState<AddonKey[]>([]);
 
   const [allowedRoutes, setAllowedRoutes] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -179,6 +183,7 @@ export default function UserManagementPage() {
     siteName: u.site_name || "",
     siteId: u.site_id ?? null,
     isCurrentUser: !!u.is_current_user,
+    addons: normalizeAddons((u as any)?.addons),
   });
 
   const fetchUsers = async (opts?: { nextPage?: number; nextPageSize?: number; nextQuery?: string; nextRole?: string; nextSiteId?: string }) => {
@@ -338,6 +343,24 @@ export default function UserManagementPage() {
       { key: "role", header: "Role" },
       { key: "siteName", header: "Site" },
       {
+        key: "addons",
+        header: "Add-ons",
+        className: "min-w-[180px]",
+        render: (row) => (
+          row.addons.length ? (
+            <div className="flex flex-wrap gap-1">
+              {row.addons.map((key) => (
+                <span key={key} className="px-1.5 py-0.5 rounded bg-green-50 text-[#0D542B] text-xs">
+                  {ADDON_LABELS[key]}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-400 text-xs">None</span>
+          )
+        ),
+      },
+      {
         key: "actions",
         header: "Actions",
         className: "text-right",
@@ -364,6 +387,7 @@ export default function UserManagementPage() {
                   setCompanyI(row.companyId != null ? String(row.companyId) : '');
                   setSiteI(row.siteId != null ? String(row.siteId) : '');
                   setPasswordI("");
+                  setAddonsI(normalizeAddons(row.addons));
                   setEditOpen(true);
                   setSuccess(null);
                   setError(null);
@@ -413,6 +437,7 @@ export default function UserManagementPage() {
     setCompanyI('');
     setSiteI('');
     setPasswordI('');
+    setAddonsI([]);
   };
 
   const handleCreate = async () => {
@@ -428,6 +453,7 @@ export default function UserManagementPage() {
         role: roleI,
         site_id: Number.isFinite(site_id as any) ? Number(site_id) : undefined,
         password: passwordI,
+        addons: addonsI,
       };
       const res = await fetch('/admin/api/users', {
         method: 'POST',
@@ -463,6 +489,7 @@ export default function UserManagementPage() {
         fullName: `${firstNameI} ${lastNameI}`.trim(),
         role: roleI,
         site_id: Number.isFinite(site_id as any) ? Number(site_id) : undefined,
+        addons: addonsI,
       };
       if (passwordI.trim()) body.password = passwordI;
 
@@ -476,6 +503,13 @@ export default function UserManagementPage() {
         return handleUnauthorized();
       }
       if (!res.ok || data?.success === false) throw new Error(data?.error || data?.message || 'Failed to update user');
+      try {
+        const raw = localStorage.getItem('user');
+        const me = raw ? JSON.parse(raw) : null;
+        if (me && Number(me.id) === Number(editUserId)) {
+          localStorage.setItem('user', JSON.stringify({ ...me, addons: addonsI }));
+        }
+      } catch {}
       setSuccess('User updated successfully');
       setEditOpen(false);
       resetForm();
@@ -649,7 +683,7 @@ export default function UserManagementPage() {
 
       {inviteOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
               <div className="text-base font-semibold text-gray-900">Invite User</div>
               <button onClick={() => setInviteOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -725,6 +759,24 @@ export default function UserManagementPage() {
                 <div className="sm:col-span-2">
                   <input value={passwordI} onChange={(e)=>setPasswordI(e.target.value)} placeholder="Password" type="password" className="w-full border rounded-md px-3 py-2 text-sm" />
                 </div>
+                <div className="sm:col-span-2 border rounded-md px-3 py-2">
+                  <div className="text-sm font-medium text-gray-800 mb-1">Purchased add-ons</div>
+                  <p className="text-xs text-gray-500 mb-2">Only selected sensors appear on this user’s dashboard and history table.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {ADDON_KEYS.map((key) => (
+                      <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={addonsI.includes(key)}
+                          onChange={() => {
+                            setAddonsI((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+                          }}
+                        />
+                        {ADDON_LABELS[key]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="mt-3">
                 <button
@@ -742,7 +794,7 @@ export default function UserManagementPage() {
 
       {editOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
               <div className="text-base font-semibold text-gray-900">Edit User</div>
               <button
@@ -825,6 +877,24 @@ export default function UserManagementPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <input value={passwordI} onChange={(e)=>setPasswordI(e.target.value)} placeholder="New Password (optional)" type="password" className="w-full border rounded-md px-3 py-2 text-sm" />
+                </div>
+                <div className="sm:col-span-2 border rounded-md px-3 py-2">
+                  <div className="text-sm font-medium text-gray-800 mb-1">Purchased add-ons</div>
+                  <p className="text-xs text-gray-500 mb-2">Only selected sensors appear on this user’s dashboard and history table.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {ADDON_KEYS.map((key) => (
+                      <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={addonsI.includes(key)}
+                          onChange={() => {
+                            setAddonsI((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+                          }}
+                        />
+                        {ADDON_LABELS[key]}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="mt-3">

@@ -1,5 +1,4 @@
 import React from 'react';
-import CircularProgress from '@mui/material/CircularProgress';
 import DataTable, { Column } from '@/components/table/DataTable';
 import { usePathname, useRouter } from 'next/navigation';
 import { formatPumpTimestamp } from '@/utils/datetime';
@@ -18,7 +17,8 @@ type HistoryRow = {
   battery: number;
 };
 
-const format2 = (n: number): string => {
+const format2 = (n: number | null | undefined): string => {
+  if (n == null) return '';
   const x = Number(n);
   if (!Number.isFinite(x)) return '';
   return Number.isInteger(x) ? String(x) : x.toFixed(2);
@@ -40,13 +40,13 @@ const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
 
 const columns: Column<HistoryRow>[] = [
   { key: 'ts', header: 'Timestamp', render: (r) => formatPumpTimestamp(r.ts) },
-  { key: 'highAdc', header: 'High ADC Reading' },
+  { key: 'highAdc', header: 'High ADC' },
   { key: 'currentAdc', header: 'Current ADC' },
-  { key: 'lowAdc', header: 'Low ADC Reading' },
+  { key: 'lowAdc', header: 'Low ADC' },
   { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
-  { key: 'cycle', header: 'Cycle' },
+  { key: 'cycle', header: 'Cycles' },
   { key: 'timeouts', header: 'Timeouts' },
-  { key: 'battery', header: 'Battery Voltage', render: (r) => format2(r.battery) },
+  { key: 'battery', header: 'Battery', render: (r) => format2(r.battery) },
 ];
 
 const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
@@ -93,8 +93,10 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
   }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
-    const header = ['Timestamp','High ADC Reading','Current ADC','Low ADC Reading','Gallons','Cycle','Timeouts','Battery Voltage'];
-    const lines = rows.map(r => [r.ts, r.highAdc, r.currentAdc, r.lowAdc, r.gallons, r.cycle, r.timeouts, r.battery].join(','));
+    if (!rows) return;
+    const header = columns.map((c) => String(c.header));
+    const keys = columns.map((c) => String(c.key));
+    const lines = rows.map((r) => keys.map((k) => (r as any)[k] ?? '').join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -119,7 +121,6 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 1 Month</option>
           </select>
-          {/* Expand fullscreen */}
           <button
             type="button"
             onClick={()=>{
@@ -132,7 +133,6 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" strokeWidth="1.5"/></svg>
           </button>
-          {/* Save/Export */}
           <button
             type="button"
             onClick={exportCsv}
