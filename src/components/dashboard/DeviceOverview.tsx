@@ -110,13 +110,13 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
                 }))
               )
             : [];
-          const c = sortByTimestamp(
+          const c: Array<{ name: string; cycleCount: number }> = sortByTimestamp(
             (Array.isArray(json.cycle_count) ? json.cycle_count : []).map((r: any) => ({
               name: String(r.ts ?? ''),
               cycleCount: Math.round(Number(r.value) || 0),
             }))
           );
-          const t = sortByTimestamp(
+          const t: Array<{ name: string; timeouts: number }> = sortByTimestamp(
             (Array.isArray(json.timeouts) ? json.timeouts : []).map((r: any) => ({
               name: String(r.ts ?? ''),
               timeouts: Math.round(Number(r.value) || 0),
