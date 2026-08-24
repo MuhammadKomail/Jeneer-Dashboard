@@ -328,6 +328,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
                 dataKey="value"
                 barColor="#0D9488"
                 timeframe={effectiveTimeframe}
+                emptyMessage={`No ${ADDON_LABELS[auxMetric]?.toLowerCase() || 'sensor'} readings for this pump yet.`}
                 controls={
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <Select
@@ -356,6 +357,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
                 title={ADDON_LABELS[auxMetric] || 'Sensor'}
                 dataKey="value"
                 timeframe={effectiveTimeframe}
+                emptyMessage={`No ${ADDON_LABELS[auxMetric]?.toLowerCase() || 'sensor'} readings for this pump yet.`}
                 controls={
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <Select
@@ -379,16 +381,11 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
                 }
               />
             )}
-            {!auxHasData && (
-              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                No {ADDON_LABELS[auxMetric]?.toLowerCase() || 'sensor'} readings for this pump yet.
-              </Typography>
-            )}
           </Grid>
         )}
 
         <Grid item xs={12}>
-          <HistoryTable deviceSerial={deviceSerial} />
+          <HistoryTable deviceSerial={deviceSerial} wellId={wellLabel} />
         </Grid>
         <Grid item xs={12}>
           <PumpSettingsTable deviceSerial={deviceSerial} />

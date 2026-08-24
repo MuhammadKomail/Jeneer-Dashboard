@@ -8,13 +8,13 @@ export type TemperaturePoint = { name: string; temp: number };
 const TemperatureBarChart: React.FC<{ data?: TemperaturePoint[]; controls?: React.ReactNode }> = ({ data, controls }) => {
   if (!data || data.length === 0) {
     return (
-      <ChartCard title="Temperature (Real-time)" subtitle="" rightControls={controls}>
+      <ChartCard title="Temperature" subtitle="" rightControls={controls}>
         <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
       </ChartCard>
     );
   }
   return (
-    <ChartCard title="Temperature (Real-time)" subtitle="" rightControls={controls}>
+    <ChartCard title="Temperature" subtitle="" rightControls={controls}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
           <XAxis

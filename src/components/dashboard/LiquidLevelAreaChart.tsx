@@ -13,16 +13,17 @@ const LiquidLevelAreaChart: React.FC<{
   title?: string;
   dataKey?: string;
   timeframe?: Timeframe;
-}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', timeframe = 'month' }) => {
+  emptyMessage?: string;
+}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', timeframe = 'month', emptyMessage = 'No data' }) => {
   if (!data || data.length === 0) {
     return (
-      <ChartCard title={title} subtitle="Real-time" rightControls={controls}>
-        <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
+      <ChartCard title={title} subtitle="" rightControls={controls} emptyMessage={emptyMessage}>
+        <div />
       </ChartCard>
     );
   }
   return (
-    <ChartCard title={title} subtitle="Real-time" rightControls={controls}>
+    <ChartCard title={title} subtitle="" rightControls={controls}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
           <XAxis

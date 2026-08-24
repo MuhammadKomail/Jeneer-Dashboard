@@ -761,7 +761,9 @@ export default function UserManagementPage() {
                 </div>
                 <div className="sm:col-span-2 border rounded-md px-3 py-2">
                   <div className="text-sm font-medium text-gray-800 mb-1">Purchased add-ons</div>
-                  <p className="text-xs text-gray-500 mb-2">Only selected sensors appear on this user’s dashboard and history table.</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Optional user entitlements. Leave empty to inherit the site’s add-ons. If set, only sensors also enabled on the site are shown.
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ADDON_KEYS.map((key) => (
                       <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -880,7 +882,9 @@ export default function UserManagementPage() {
                 </div>
                 <div className="sm:col-span-2 border rounded-md px-3 py-2">
                   <div className="text-sm font-medium text-gray-800 mb-1">Purchased add-ons</div>
-                  <p className="text-xs text-gray-500 mb-2">Only selected sensors appear on this user’s dashboard and history table.</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Optional user entitlements. Leave empty to inherit the site’s add-ons. If set, only sensors also enabled on the site are shown.
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ADDON_KEYS.map((key) => (
                       <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">

@@ -10,8 +10,8 @@ type Timeframe = 'day' | 'week' | 'month';
 const GallonsBarChart: React.FC<{ data?: GallonsPoint[]; title?: string; controls?: React.ReactNode; timeframe?: Timeframe }> = ({ data, title = 'Gallons Pumped', controls, timeframe = 'month' }) => {
   if (!data || data.length === 0) {
     return (
-      <ChartCard title={title} subtitle="" rightControls={controls}>
-        <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
+      <ChartCard title={title} subtitle="" rightControls={controls} emptyMessage="No data">
+        <div />
       </ChartCard>
     );
   }

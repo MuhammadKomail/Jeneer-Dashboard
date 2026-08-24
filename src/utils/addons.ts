@@ -44,3 +44,23 @@ export function readUserAddons(): AddonKey[] {
     return [];
   }
 }
+
+/** Site empty → user-only. Site set + user empty → inherit site. Both set → site ∩ user. */
+export function resolveAddons({
+  userAddons,
+  siteAddons,
+  roles = [],
+}: {
+  userAddons?: unknown;
+  siteAddons?: unknown;
+  roles?: unknown[];
+} = {}): AddonKey[] {
+  const isAdmin = roles.some((role) => isAdminRole(role));
+  const site = normalizeAddons(siteAddons);
+  const user = normalizeAddons(userAddons);
+
+  if (isAdmin) return site.length ? site : [...ADDON_KEYS];
+  if (!site.length) return user;
+  if (!user.length) return site;
+  return user.filter((k) => site.includes(k));
+}

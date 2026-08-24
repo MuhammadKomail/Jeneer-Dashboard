@@ -14,11 +14,20 @@ const LiquidLevelBarChart: React.FC<{
   dataKey?: string;
   barColor?: string;
   timeframe?: Timeframe;
-}> = ({ data, controls, title = 'Liquid Level', dataKey = 'level', barColor = '#EA860A', timeframe = 'month' }) => {
+  emptyMessage?: string;
+}> = ({
+  data,
+  controls,
+  title = 'Liquid Level',
+  dataKey = 'level',
+  barColor = '#EA860A',
+  timeframe = 'month',
+  emptyMessage = 'No data',
+}) => {
   if (!data || data.length === 0) {
     return (
-      <ChartCard title={title} subtitle="" rightControls={controls}>
-        <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
+      <ChartCard title={title} subtitle="" rightControls={controls} emptyMessage={emptyMessage}>
+        <div />
       </ChartCard>
     );
   }

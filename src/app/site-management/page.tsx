@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Trash2 } from "lucide-react";
+import { ADDON_KEYS, ADDON_LABELS, AddonKey, normalizeAddons } from "@/utils/addons";
 
 type Company = {
   id: number;
@@ -40,6 +41,7 @@ type ApiSite = {
   zip: string;
   total_pumps: number;
   devices: ApiDevice[];
+  addons?: string[];
 };
 
 type ApiCompanySites = {
@@ -78,6 +80,7 @@ type SiteDetail = {
   siteName: string;
   totalPumps: number;
   devices: ApiDevice[];
+  addons: AddonKey[];
 };
 
 type DeviceEdit = {
@@ -186,6 +189,7 @@ export default function SiteManagementPage() {
   const [wellIdI, setWellIdI] = useState("");
   const [devices, setDevices] = useState<DeviceInput[]>([]);
   const [showPumpForm, setShowPumpForm] = useState(false);
+  const [siteAddonsI, setSiteAddonsI] = useState<AddonKey[]>([]);
 
   const [siteBusy, setSiteBusy] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -193,6 +197,7 @@ export default function SiteManagementPage() {
   const [editLocationId, setEditLocationId] = useState<number | null>(null);
   const [editCompanyId, setEditCompanyId] = useState<string>("");
   const [editLocation, setEditLocation] = useState<string>("");
+  const [editAddons, setEditAddons] = useState<AddonKey[]>([]);
   const [editDevices, setEditDevices] = useState<DeviceEdit[]>([]);
   const [editNewDeviceSerial, setEditNewDeviceSerial] = useState("");
   const [editNewProduct, setEditNewProduct] = useState("");
@@ -218,6 +223,7 @@ export default function SiteManagementPage() {
     setGeoPreview('');
     setDevices([]);
     setShowPumpForm(false);
+    setSiteAddonsI([]);
   };
 
   const handleDeleteCompany = async (companyId: number, companyName: string) => {
@@ -255,11 +261,13 @@ export default function SiteManagementPage() {
       siteName: row.siteName,
       totalPumps: row.totalPumps,
       devices: row.devices,
+      addons: [] as AddonKey[],
     };
 
     setEditLocationId(src.locationId);
     setEditCompanyId(String(src.companyId));
     setEditLocation(String(src.siteName ?? ""));
+    setEditAddons(normalizeAddons((src as any).addons));
     setEditDevices(
       (Array.isArray(src.devices) ? src.devices : []).map((d) => ({
         id: Number(d.id),
@@ -309,6 +317,7 @@ export default function SiteManagementPage() {
       const body: any = {};
       if (editCompanyId) body.comp_id = Number(editCompanyId);
       if (editLocation.trim()) body.location = editLocation.trim();
+      body.addons = editAddons;
       if (devicesPayload.length > 0) body.devices = devicesPayload;
       if (deleteDeviceIds.length > 0) body.deleteDeviceIds = deleteDeviceIds;
 
@@ -361,6 +370,7 @@ export default function SiteManagementPage() {
       const payload = {
         comp_id: Number(siteCompanyIdI),
         location: locationI.trim(),
+        addons: siteAddonsI,
         devices,
       };
 
@@ -404,6 +414,7 @@ export default function SiteManagementPage() {
             siteName: String(s.site_name ?? ''),
             totalPumps: Number(s.total_pumps ?? 0),
             devices: siteDevices,
+            addons: normalizeAddons((s as any)?.addons),
           };
           nextRows.push({
             companyId: Number(c.company_id),
@@ -750,6 +761,29 @@ export default function SiteManagementPage() {
               <input value={locationI} onChange={(e) => setLocationI(e.target.value)} placeholder="Pine Bluff 123" className="w-full border rounded-md px-3 py-2 text-sm" />
             </div>
 
+            <div className="border rounded-md px-3 py-2">
+              <div className="text-sm font-medium text-gray-800 mb-1">Site add-ons</div>
+              <p className="text-xs text-gray-500 mb-2">
+                Sensors available at this site. If a user has no personal add-ons, they inherit these. If they have personal add-ons, only the overlap is shown.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ADDON_KEYS.map((key) => (
+                  <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={siteAddonsI.includes(key)}
+                      onChange={() => {
+                        setSiteAddonsI((prev) =>
+                          prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+                        );
+                      }}
+                    />
+                    {ADDON_LABELS[key]}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs text-gray-600 mb-1">Add Devices</label>
               {!showPumpForm && (
@@ -921,6 +955,29 @@ export default function SiteManagementPage() {
             <div>
               <label className="block text-xs text-gray-600 mb-1">Location</label>
               <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+            </div>
+
+            <div className="border rounded-md px-3 py-2">
+              <div className="text-sm font-medium text-gray-800 mb-1">Site add-ons</div>
+              <p className="text-xs text-gray-500 mb-2">
+                Sensors available at this site. If a user has no personal add-ons, they inherit these. If they have personal add-ons, only the overlap is shown.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ADDON_KEYS.map((key) => (
+                  <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={editAddons.includes(key)}
+                      onChange={() => {
+                        setEditAddons((prev) =>
+                          prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+                        );
+                      }}
+                    />
+                    {ADDON_LABELS[key]}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div>

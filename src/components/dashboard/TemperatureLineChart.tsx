@@ -16,13 +16,13 @@ const TemperatureLineChart: React.FC<{
 }> = ({ data, controls, title = 'Temperature', dataKey = 'temperature', timeframe = 'month' }) => {
   if (!data || data.length === 0) {
     return (
-      <ChartCard title={title} subtitle="Real-time" rightControls={controls}>
-        <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">No data</div>
+      <ChartCard title={title} subtitle="" rightControls={controls} emptyMessage="No data">
+        <div />
       </ChartCard>
     );
   }
   return (
-    <ChartCard title={title} subtitle="Real-time" rightControls={controls}>
+    <ChartCard title={title} subtitle="" rightControls={controls}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <XAxis

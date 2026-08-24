@@ -64,7 +64,7 @@ function buildColumns(addons: AddonKey[]): Column<HistoryRow>[] {
   return [...baseColumns, ...addonColumns, batteryColumn];
 }
 
-const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
+const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ deviceSerial, wellId }) => {
   const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('30d');
   const router = useRouter();
   const pathname = usePathname();
@@ -73,8 +73,47 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
   const [total, setTotal] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
+  const [exporting, setExporting] = React.useState(false);
 
   const columns = React.useMemo(() => buildColumns(addons), [addons]);
+
+  const authHeaders = React.useCallback(() => {
+    try {
+      const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+      const token = m ? decodeURIComponent(m[1]) : null;
+      return token ? { Authorization: `Bearer ${token}` } : undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  const normalizeHistoryRows = React.useCallback((rawRows: any[], ordered: AddonKey[]): HistoryRow[] => {
+    return (rawRows || []).map((row) => {
+      const base: HistoryRow = {
+        ts: String(row?.ts ?? row?.timestamp ?? row?.created_at ?? ''),
+        highAdc: Number(row?.highAdc ?? row?.high_adc ?? row?.high_adc_reading ?? 0) || 0,
+        currentAdc: Number(row?.currentAdc ?? row?.current_adc ?? row?.current_adc_reading ?? 0) || 0,
+        lowAdc: Number(row?.lowAdc ?? row?.low_adc ?? row?.low_adc_reading ?? 0) || 0,
+        gallons: Number(row?.gallons ?? 0) || 0,
+        cycle: Number(row?.cycle ?? 0) || 0,
+        timeouts: Number(row?.timeouts ?? 0) || 0,
+        totalGallons: Number(row?.totalGallons ?? row?.total_gallons ?? 0) || 0,
+        totalCycles: Number(row?.totalCycles ?? row?.total_cycles ?? 0) || 0,
+        totalTimeouts: Number(row?.totalTimeouts ?? row?.total_timeouts ?? 0) || 0,
+        battery: Number(row?.battery ?? 0) || 0,
+      };
+      for (const key of ordered) {
+        const raw = row?.[key];
+        if (raw == null || raw === '') {
+          base[key] = null;
+        } else {
+          const n = Number(raw);
+          base[key] = Number.isFinite(n) ? n : null;
+        }
+      }
+      return base;
+    });
+  }, []);
 
   React.useEffect(() => {
     let ignore = false;
@@ -86,52 +125,18 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
     }
     (async () => {
       try {
-        const token = (() => {
-          try {
-            const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
-            return m ? decodeURIComponent(m[1]) : null;
-          } catch {
-            return null;
-          }
-        })();
         const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/history?range=${range}&page=${page}&pageSize=${pageSize}`;
         const res = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          headers: authHeaders(),
           cache: 'no-store',
         });
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && Array.isArray(json?.rows)) {
           const enabled = normalizeAddons(json.addons?.length ? json.addons : readUserAddons());
-          // Preserve product order from ADDON_KEYS
           const ordered = ADDON_KEYS.filter((k) => enabled.includes(k));
           setAddons(ordered);
-
-          const normalized = (json.rows as any[]).map((row) => {
-            const base: HistoryRow = {
-              ts: String(row?.ts ?? row?.timestamp ?? row?.created_at ?? ''),
-              highAdc: Number(row?.highAdc ?? row?.high_adc ?? row?.high_adc_reading ?? 0) || 0,
-              currentAdc: Number(row?.currentAdc ?? row?.current_adc ?? row?.current_adc_reading ?? 0) || 0,
-              lowAdc: Number(row?.lowAdc ?? row?.low_adc ?? row?.low_adc_reading ?? 0) || 0,
-              gallons: Number(row?.gallons ?? 0) || 0,
-              cycle: Number(row?.cycle ?? 0) || 0,
-              timeouts: Number(row?.timeouts ?? 0) || 0,
-              totalGallons: Number(row?.totalGallons ?? row?.total_gallons ?? 0) || 0,
-              totalCycles: Number(row?.totalCycles ?? row?.total_cycles ?? 0) || 0,
-              totalTimeouts: Number(row?.totalTimeouts ?? row?.total_timeouts ?? 0) || 0,
-              battery: Number(row?.battery ?? 0) || 0,
-            };
-            for (const key of ordered) {
-              const raw = row?.[key];
-              if (raw == null || raw === '') {
-                base[key] = null;
-              } else {
-                const n = Number(raw);
-                base[key] = Number.isFinite(n) ? n : null;
-              }
-            }
-            return base;
-          });
+          const normalized = normalizeHistoryRows(json.rows, ordered);
           setRows(normalized);
           setTotal(Number(json.total) || normalized.length);
         } else {
@@ -150,21 +155,67 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
     return () => {
       ignore = true;
     };
-  }, [deviceSerial, range, page, pageSize]);
+  }, [deviceSerial, range, page, pageSize, authHeaders, normalizeHistoryRows]);
 
-  const exportCsv = () => {
-    if (!rows) return;
-    const header = columns.map((c) => String(c.header));
-    const keys = columns.map((c) => String(c.key));
-    const lines = rows.map((r) => keys.map((k) => (r as any)[k] ?? '').join(','));
-    const csv = [header.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `history_${range}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const fetchAllRowsForExport = async (): Promise<HistoryRow[]> => {
+    if (!deviceSerial) return rows || [];
+    const exportPageSize = 1000;
+    let pageNum = 1;
+    let totalRows = Infinity;
+    const all: HistoryRow[] = [];
+    let ordered = addons;
+
+    while (all.length < totalRows) {
+      const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/history?range=${range}&page=${pageNum}&pageSize=${exportPageSize}`;
+      const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok || !Array.isArray(json?.rows)) break;
+      if (pageNum === 1) {
+        const enabled = normalizeAddons(json.addons?.length ? json.addons : readUserAddons());
+        ordered = ADDON_KEYS.filter((k) => enabled.includes(k));
+        totalRows = Number(json.total) || json.rows.length;
+      }
+      const chunk = normalizeHistoryRows(json.rows, ordered);
+      all.push(...chunk);
+      if (chunk.length === 0) break;
+      if (chunk.length < exportPageSize) break;
+      pageNum += 1;
+      if (pageNum > 200) break;
+    }
+    return all;
+  };
+
+  const exportCsv = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const exportRows = await fetchAllRowsForExport();
+      if (!exportRows.length) return;
+      const header = columns.map((c) => String(c.header));
+      const keys = columns.map((c) => String(c.key));
+      const lines = exportRows.map((r) =>
+        keys
+          .map((k) => {
+            const val = (r as any)[k] ?? '';
+            const s = String(val);
+            return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+          })
+          .join(',')
+      );
+      const csv = [header.join(','), ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeWell = String(wellId || deviceSerial || 'well')
+        .trim()
+        .replace(/[^\w.-]+/g, '_');
+      a.download = `history_${range}_${safeWell}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -187,8 +238,11 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           <button
             type="button"
             onClick={() => {
-              const url = `${pathname}?view=history${deviceSerial ? `&device=${encodeURIComponent(deviceSerial)}` : ''}`;
-              router.push(url);
+              const params = new URLSearchParams();
+              params.set('view', 'history');
+              if (deviceSerial) params.set('device', deviceSerial);
+              if (wellId) params.set('well', wellId);
+              router.push(`${pathname}?${params.toString()}`);
             }}
             className="p-2 rounded-md border hover:bg-gray-50"
             title="Fullscreen"
@@ -200,9 +254,12 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           </button>
           <button
             type="button"
-            onClick={exportCsv}
-            className="p-2 rounded-md border hover:bg-gray-50"
-            title="Save CSV"
+            onClick={() => {
+              void exportCsv();
+            }}
+            disabled={exporting || rows === null}
+            className="p-2 rounded-md border hover:bg-gray-50 disabled:opacity-50"
+            title={exporting ? 'Exporting…' : 'Save CSV'}
             aria-label="Save CSV"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
