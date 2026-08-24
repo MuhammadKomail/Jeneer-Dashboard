@@ -2,6 +2,7 @@ import React from 'react';
 import DataTable, { Column } from '@/components/table/DataTable';
 import { usePathname, useRouter } from 'next/navigation';
 import { formatPumpTimestamp } from '@/utils/datetime';
+import { ADDON_KEYS, ADDON_LABELS, AddonKey, normalizeAddons, readUserAddons } from '@/utils/addons';
 
 type HistoryRow = {
   ts: string;
@@ -15,7 +16,7 @@ type HistoryRow = {
   totalCycles: number;
   totalTimeouts: number;
   battery: number;
-};
+} & Partial<Record<AddonKey, number | null>>;
 
 const format2 = (n: number | null | undefined): string => {
   if (n == null) return '';
@@ -38,7 +39,7 @@ const fallbackRows: HistoryRow[] = Array.from({ length: 18 }).map((_, i) => ({
   battery: 12.8 + (i % 6) * 0.2,
 }));
 
-const columns: Column<HistoryRow>[] = [
+const baseColumns: Column<HistoryRow>[] = [
   { key: 'ts', header: 'Timestamp', render: (r) => formatPumpTimestamp(r.ts) },
   { key: 'highAdc', header: 'High ADC' },
   { key: 'currentAdc', header: 'Current ADC' },
@@ -46,50 +47,109 @@ const columns: Column<HistoryRow>[] = [
   { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
   { key: 'cycle', header: 'Cycles' },
   { key: 'timeouts', header: 'Timeouts' },
-  { key: 'battery', header: 'Battery', render: (r) => format2(r.battery) },
 ];
+
+const batteryColumn: Column<HistoryRow> = {
+  key: 'battery',
+  header: 'Battery',
+  render: (r) => format2(r.battery),
+};
+
+function buildColumns(addons: AddonKey[]): Column<HistoryRow>[] {
+  const addonColumns: Column<HistoryRow>[] = addons.map((key) => ({
+    key,
+    header: ADDON_LABELS[key],
+    render: (r) => format2(r[key] as number | null | undefined),
+  }));
+  return [...baseColumns, ...addonColumns, batteryColumn];
+}
 
 const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
   const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('30d');
   const router = useRouter();
   const pathname = usePathname();
   const [rows, setRows] = React.useState<HistoryRow[] | null>(null);
+  const [addons, setAddons] = React.useState<AddonKey[]>([]);
   const [total, setTotal] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
 
+  const columns = React.useMemo(() => buildColumns(addons), [addons]);
+
   React.useEffect(() => {
     let ignore = false;
-    if (!deviceSerial) { setRows(fallbackRows); setTotal(fallbackRows.length); return; }
+    if (!deviceSerial) {
+      setAddons(readUserAddons());
+      setRows(fallbackRows);
+      setTotal(fallbackRows.length);
+      return;
+    }
     (async () => {
       try {
-        const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
+        const token = (() => {
+          try {
+            const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+            return m ? decodeURIComponent(m[1]) : null;
+          } catch {
+            return null;
+          }
+        })();
         const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/history?range=${range}&page=${page}&pageSize=${pageSize}`;
-        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: 'no-store',
+        });
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && Array.isArray(json?.rows)) {
-          const normalized = (json.rows as any[]).map((row) => ({
-            ts: String(row?.ts ?? row?.timestamp ?? row?.created_at ?? ''),
-            highAdc: Number(row?.highAdc ?? row?.high_adc ?? row?.high_adc_reading ?? 0) || 0,
-            currentAdc: Number(row?.currentAdc ?? row?.current_adc ?? row?.current_adc_reading ?? 0) || 0,
-            lowAdc: Number(row?.lowAdc ?? row?.low_adc ?? row?.low_adc_reading ?? 0) || 0,
-            gallons: Number(row?.gallons ?? 0) || 0,
-            cycle: Number(row?.cycle ?? 0) || 0,
-            timeouts: Number(row?.timeouts ?? 0) || 0,
-            totalGallons: Number(row?.totalGallons ?? row?.total_gallons ?? 0) || 0,
-            totalCycles: Number(row?.totalCycles ?? row?.total_cycles ?? 0) || 0,
-            totalTimeouts: Number(row?.totalTimeouts ?? row?.total_timeouts ?? 0) || 0,
-            battery: Number(row?.battery ?? 0) || 0,
-          }));
-          setRows(normalized as HistoryRow[]);
+          const enabled = normalizeAddons(json.addons?.length ? json.addons : readUserAddons());
+          // Preserve product order from ADDON_KEYS
+          const ordered = ADDON_KEYS.filter((k) => enabled.includes(k));
+          setAddons(ordered);
+
+          const normalized = (json.rows as any[]).map((row) => {
+            const base: HistoryRow = {
+              ts: String(row?.ts ?? row?.timestamp ?? row?.created_at ?? ''),
+              highAdc: Number(row?.highAdc ?? row?.high_adc ?? row?.high_adc_reading ?? 0) || 0,
+              currentAdc: Number(row?.currentAdc ?? row?.current_adc ?? row?.current_adc_reading ?? 0) || 0,
+              lowAdc: Number(row?.lowAdc ?? row?.low_adc ?? row?.low_adc_reading ?? 0) || 0,
+              gallons: Number(row?.gallons ?? 0) || 0,
+              cycle: Number(row?.cycle ?? 0) || 0,
+              timeouts: Number(row?.timeouts ?? 0) || 0,
+              totalGallons: Number(row?.totalGallons ?? row?.total_gallons ?? 0) || 0,
+              totalCycles: Number(row?.totalCycles ?? row?.total_cycles ?? 0) || 0,
+              totalTimeouts: Number(row?.totalTimeouts ?? row?.total_timeouts ?? 0) || 0,
+              battery: Number(row?.battery ?? 0) || 0,
+            };
+            for (const key of ordered) {
+              const raw = row?.[key];
+              if (raw == null || raw === '') {
+                base[key] = null;
+              } else {
+                const n = Number(raw);
+                base[key] = Number.isFinite(n) ? n : null;
+              }
+            }
+            return base;
+          });
+          setRows(normalized);
           setTotal(Number(json.total) || normalized.length);
         } else {
-          setRows([]); setTotal(0);
+          setAddons(readUserAddons());
+          setRows([]);
+          setTotal(0);
         }
-      } catch { if (!ignore) { setRows([]); setTotal(0); } }
+      } catch {
+        if (!ignore) {
+          setAddons(readUserAddons());
+          setRows([]);
+          setTotal(0);
+        }
+      }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [deviceSerial, range, page, pageSize]);
 
   const exportCsv = () => {
@@ -114,7 +174,10 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
         <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
           <select
             value={range}
-            onChange={(e)=>{ setRange(e.target.value as any); setPage(1); }}
+            onChange={(e) => {
+              setRange(e.target.value as any);
+              setPage(1);
+            }}
             className="px-3 py-1.5 bg-white border rounded-md text-sm text-gray-700"
           >
             <option value="24h">Last 24 Hours</option>
@@ -123,7 +186,7 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           </select>
           <button
             type="button"
-            onClick={()=>{
+            onClick={() => {
               const url = `${pathname}?view=history${deviceSerial ? `&device=${encodeURIComponent(deviceSerial)}` : ''}`;
               router.push(url);
             }}
@@ -131,7 +194,9 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
             title="Fullscreen"
             aria-label="Fullscreen"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" strokeWidth="1.5"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+              <path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" strokeWidth="1.5" />
+            </svg>
           </button>
           <button
             type="button"
@@ -140,7 +205,9 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
             title="Save CSV"
             aria-label="Save CSV"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeWidth="1.5"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+              <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeWidth="1.5" />
+            </svg>
           </button>
         </div>
       </div>
@@ -149,16 +216,19 @@ const HistoryTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => 
           <div className="h-10 w-10 rounded-full border-2 border-gray-300 border-t-[#3BA049] animate-spin" />
         </div>
       ) : (
-      <DataTable<HistoryRow>
-        columns={columns}
-        rows={rows || []}
-        pageSizeOptions={[10, 20, 50]}
-        total={total}
-        page={page}
-        onPageChange={(p)=>setPage(p)}
-        pageSize={pageSize}
-        onPageSizeChange={(s)=>{ setPageSize(s); setPage(1); }}
-      />
+        <DataTable<HistoryRow>
+          columns={columns}
+          rows={rows || []}
+          pageSizeOptions={[10, 20, 50]}
+          total={total}
+          page={page}
+          onPageChange={(p) => setPage(p)}
+          pageSize={pageSize}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+          }}
+        />
       )}
     </div>
   );
