@@ -3,6 +3,9 @@ import DataTable, { Column } from '@/components/table/DataTable';
 import { usePathname, useRouter } from 'next/navigation';
 import { formatPumpTimestamp } from '@/utils/datetime';
 import { ADDON_KEYS, ADDON_LABELS, AddonKey, normalizeAddons, readUserAddons } from '@/utils/addons';
+import toast from 'react-hot-toast';
+
+type HistoryRange = '24h' | '7d' | '30d' | '1y' | '5y' | 'all';
 
 type HistoryRow = {
   ts: string;
@@ -65,7 +68,7 @@ function buildColumns(addons: AddonKey[]): Column<HistoryRow>[] {
 }
 
 const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ deviceSerial, wellId }) => {
-  const [range, setRange] = React.useState<'24h' | '7d' | '30d'>('30d');
+  const [range, setRange] = React.useState<HistoryRange>('30d');
   const router = useRouter();
   const pathname = usePathname();
   const [rows, setRows] = React.useState<HistoryRow[] | null>(null);
@@ -185,23 +188,31 @@ const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ de
     return all;
   };
 
+  const csvCell = (value: unknown): string => {
+    const s = value == null ? '' : String(value);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const cellValue = (col: Column<HistoryRow>, row: HistoryRow): string => {
+    if (col.render) {
+      const rendered = col.render(row, 0);
+      if (typeof rendered === 'string' || typeof rendered === 'number') return String(rendered);
+    }
+    const raw = (row as Record<string, unknown>)[String(col.key)];
+    return raw == null ? '' : String(raw);
+  };
+
   const exportCsv = async () => {
     if (exporting) return;
     setExporting(true);
     try {
       const exportRows = await fetchAllRowsForExport();
-      if (!exportRows.length) return;
+      if (!exportRows.length) {
+        toast.error('No data to export for this range');
+        return;
+      }
       const header = columns.map((c) => String(c.header));
-      const keys = columns.map((c) => String(c.key));
-      const lines = exportRows.map((r) =>
-        keys
-          .map((k) => {
-            const val = (r as any)[k] ?? '';
-            const s = String(val);
-            return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-          })
-          .join(',')
-      );
+      const lines = exportRows.map((r) => columns.map((c) => csvCell(cellValue(c, r))).join(','));
       const csv = [header.join(','), ...lines].join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -213,6 +224,9 @@ const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ de
       a.download = `history_${range}_${safeWell}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+      toast.success(`Exported ${exportRows.length} rows`);
+    } catch {
+      toast.error('Export failed');
     } finally {
       setExporting(false);
     }
@@ -226,7 +240,7 @@ const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ de
           <select
             value={range}
             onChange={(e) => {
-              setRange(e.target.value as any);
+              setRange(e.target.value as HistoryRange);
               setPage(1);
             }}
             className="px-3 py-1.5 bg-white border rounded-md text-sm text-gray-700"
@@ -234,6 +248,9 @@ const HistoryTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ de
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 1 Month</option>
+            <option value="1y">Last 1 Year</option>
+            <option value="5y">Last 5 Years</option>
+            <option value="all">All Time</option>
           </select>
           <button
             type="button"

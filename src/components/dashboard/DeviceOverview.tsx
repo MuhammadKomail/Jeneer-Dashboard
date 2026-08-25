@@ -388,7 +388,7 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
           <HistoryTable deviceSerial={deviceSerial} wellId={wellLabel} />
         </Grid>
         <Grid item xs={12}>
-          <PumpSettingsTable deviceSerial={deviceSerial} />
+          <PumpSettingsTable deviceSerial={deviceSerial} wellId={wellLabel} />
         </Grid>
       </Grid>
     </Box>

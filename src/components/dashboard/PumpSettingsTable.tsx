@@ -59,13 +59,14 @@ const fallbackRows: SettingRow[] = Array.from({ length: 18 }).map((_, i) => ({
   volPerCycle: 0.3,
 }));
 
-const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }) => {
+const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = ({ deviceSerial, wellId }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [rows, setRows] = React.useState<SettingRow[] | null>(null);
   const [total, setTotal] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
+  const [exporting, setExporting] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [bulkEdit, setBulkEdit] = React.useState<{
     field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle';
@@ -184,14 +185,23 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
     { key: 'volPerCycle', header: headerWithEdit('Vol Per Cycle', 'volPerCycle'), render: (r) => format2(r.volPerCycle) },
   ], [headerWithEdit]);
 
+  const authHeaders = React.useCallback(() => {
+    try {
+      const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+      const token = m ? decodeURIComponent(m[1]) : null;
+      return token ? { Authorization: `Bearer ${token}` } : undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
   React.useEffect(() => {
     let ignore = false;
     if (!deviceSerial) { setRows(fallbackRows); setTotal(fallbackRows.length); return; }
     (async () => {
       try {
-        const token = (() => { try { const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; } })();
         const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings?range=all&page=${page}&pageSize=${pageSize}`;
-        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined, cache: 'no-store' });
+        const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
         const json = await res.json().catch(() => ({} as any));
         if (ignore) return;
         if (res.ok && Array.isArray(json?.rows)) {
@@ -202,19 +212,76 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
       } catch { if (!ignore) { setRows([]); setTotal(0); } }
     })();
     return () => { ignore = true; };
-  }, [deviceSerial, page, pageSize, normalizeRows]);
+  }, [deviceSerial, page, pageSize, normalizeRows, authHeaders]);
 
-  const exportCsv = () => {
-    const header = ['Timestamp','ADC Threshold Setting','Air On Time','Air Flow Timeout','Max Idle Time','Delay','Vol Per Cycle'];
-    const lines = (rows || fallbackRows).map(r => [r.ts, r.thres, r.minAir, r.maxAir, formatSecondsToHM(r.maxIdle), r.rest, r.volPerCycle].join(','));
-    const csv = [header.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pump_settings_all.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const fetchAllRowsForExport = async (): Promise<SettingRow[]> => {
+    if (!deviceSerial) return rows || [];
+    const exportPageSize = 1000;
+    let pageNum = 1;
+    let totalRows = Infinity;
+    const all: SettingRow[] = [];
+
+    while (all.length < totalRows) {
+      const url = `/admin/api/devices/${encodeURIComponent(deviceSerial)}/settings?range=all&page=${pageNum}&pageSize=${exportPageSize}`;
+      const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok || !Array.isArray(json?.rows)) break;
+      if (pageNum === 1) totalRows = Number(json.total) || json.rows.length;
+      const chunk = normalizeRows(json.rows as any[]);
+      all.push(...chunk);
+      if (chunk.length === 0) break;
+      if (chunk.length < exportPageSize) break;
+      pageNum += 1;
+      if (pageNum > 200) break;
+    }
+    return all;
+  };
+
+  const csvCell = (value: unknown): string => {
+    const s = value == null ? '' : String(value);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const exportCsv = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const exportRows = await fetchAllRowsForExport();
+      if (!exportRows.length) {
+        toast.error('No settings to export');
+        return;
+      }
+      const header = ['Timestamp', 'ADC Threshold Setting', 'Air On Time', 'Air Flow Timeout', 'Max Idle Time', 'Delay', 'Vol Per Cycle'];
+      const lines = exportRows.map((r) =>
+        [
+          formatPumpTimestamp(r.ts),
+          r.thres,
+          r.minAir,
+          r.maxAir,
+          formatSecondsToHM(r.maxIdle),
+          r.rest,
+          format2(r.volPerCycle),
+        ]
+          .map(csvCell)
+          .join(',')
+      );
+      const csv = [header.join(','), ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeWell = String(wellId || deviceSerial || 'well')
+        .trim()
+        .replace(/[^\w.-]+/g, '_');
+      a.download = `pump_settings_${safeWell}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${exportRows.length} rows`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -225,9 +292,12 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
           {/* Expand fullscreen */}
           <button
             type="button"
-            onClick={()=>{
-              const url = `${pathname}?view=settings${deviceSerial ? `&device=${encodeURIComponent(deviceSerial)}` : ''}`;
-              router.push(url);
+            onClick={() => {
+              const params = new URLSearchParams();
+              params.set('view', 'settings');
+              if (deviceSerial) params.set('device', deviceSerial);
+              if (wellId) params.set('well', wellId);
+              router.push(`${pathname}?${params.toString()}`);
             }}
             className="p-2 rounded-md border hover:bg-gray-50"
             title="Fullscreen"
@@ -238,9 +308,12 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string }> = ({ deviceSerial }
           {/* Save/Export */}
           <button
             type="button"
-            onClick={exportCsv}
-            className="p-2 rounded-md border hover:bg-gray-50"
-            title="Save CSV"
+            onClick={() => {
+              void exportCsv();
+            }}
+            disabled={exporting || rows === null}
+            className="p-2 rounded-md border hover:bg-gray-50 disabled:opacity-50"
+            title={exporting ? 'Exporting…' : 'Save CSV'}
             aria-label="Save CSV"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeWidth="1.5"/></svg>
