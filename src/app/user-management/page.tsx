@@ -270,7 +270,7 @@ export default function UserManagementPage() {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch('/admin/api/companies?page=1&pageSize=100&sort=name&order=asc', { cache: 'no-store' });
+      const res = await fetch('/admin/api/companies?page=1&pageSize=1000&sort=name&order=asc', { cache: 'no-store' });
       const data: CompaniesResponse = await res.json().catch(() => ({} as any));
       if (res.status === 401 || (data as any)?.reason === 'invalid_token' || data?.error === 'unauthorized') {
         return handleUnauthorized();

@@ -10,12 +10,13 @@ export async function GET(req: NextRequest) {
 
     const url = new URL(req.url);
     const page = url.searchParams.get('page') ?? '1';
-    const pageSize = url.searchParams.get('pageSize') ?? '10';
+    const pageSize = url.searchParams.get('pageSize') ?? '1000';
     const sort = url.searchParams.get('sort') ?? 'name';
     const order = url.searchParams.get('order') ?? 'asc';
+    const q = url.searchParams.get('q') ?? undefined;
 
     const res = await axios.get(`${baseURL}/admin/api/companies`, {
-      params: { page, pageSize, sort, order },
+      params: { page, pageSize, sort, order, ...(q ? { q } : {}) },
       headers: { Authorization: `Bearer ${token}` },
       validateStatus: () => true,
     });
