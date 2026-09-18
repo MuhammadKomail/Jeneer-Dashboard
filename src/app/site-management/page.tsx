@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Trash2, RotateCcw } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import { ADDON_KEYS, ADDON_LABELS, AddonKey, normalizeAddons } from "@/utils/addons";
 
 type Company = {
@@ -217,7 +217,6 @@ export default function SiteManagementPage() {
   const [editNewLat, setEditNewLat] = useState<number | null>(null);
   const [editNewLng, setEditNewLng] = useState<number | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<number | null>(null);
-  const [resetOpenId, setResetOpenId] = useState<number | null>(null);
 
   const beginLoading = () => setApiLoadingCount((c) => c + 1);
   const endLoading = () => setApiLoadingCount((c) => Math.max(0, c - 1));
@@ -365,32 +364,6 @@ export default function SiteManagementPage() {
       await fetchSites();
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete site");
-    } finally {
-      endLoading();
-    }
-  };
-
-  const handleResetSiteData = async (locationId: number) => {
-    if (!isSuperAdmin) {
-      toast.error('Unauthorized');
-      return;
-    }
-    beginLoading();
-    try {
-      const res = await fetch(`/admin/api/locations/${locationId}/reset-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data: any = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to reset site data');
-
-      const d = data?.deleted || {};
-      toast.success(
-        `Site data reset (${data?.devices ?? 0} pumps): history ${d.pump_data ?? 0}, settings ${d.pump_settings ?? 0}, aux ${d.pump_aux_data ?? 0}`
-      );
-      await fetchSites();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to reset site data');
     } finally {
       endLoading();
     }
@@ -609,16 +582,6 @@ export default function SiteManagementPage() {
                 <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" strokeWidth="1.5" />
               </svg>
             </button>
-            {isSuperAdmin && (
-              <button
-                className="text-amber-600"
-                title="Reset Data"
-                aria-label="Reset Data"
-                onClick={() => setResetOpenId(row.locationId)}
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            )}
             <button
               className="text-red-600"
               title="Delete"
@@ -634,7 +597,7 @@ export default function SiteManagementPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [siteDetails, isSuperAdmin]
+    [siteDetails]
   );
 
   return (
@@ -1252,49 +1215,6 @@ export default function SiteManagementPage() {
               disabled={apiLoadingCount > 0}
             >
               Delete
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={resetOpenId !== null} onOpenChange={(o) => !apiLoadingCount && setResetOpenId(o ? resetOpenId : null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset Site Data?</DialogTitle>
-          </DialogHeader>
-          <div className="text-sm text-gray-700 space-y-2">
-            <p>
-              This permanently deletes history, settings history, aux sensor data, and pending setting
-              commands for all pumps on{' '}
-              <span className="font-semibold">
-                {rows.find((r) => r.locationId === resetOpenId)?.siteName || 'this site'}
-              </span>
-              .
-            </p>
-            <p className="text-gray-600">
-              The site and pumps stay registered (serial, well ID, map). New readings will appear when
-              the pump reports again.
-            </p>
-          </div>
-          <DialogFooter>
-            <button
-              className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 text-sm"
-              onClick={() => setResetOpenId(null)}
-              disabled={apiLoadingCount > 0}
-            >
-              Cancel
-            </button>
-            <button
-              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-sm disabled:opacity-60"
-              onClick={async () => {
-                if (resetOpenId === null) return;
-                const id = resetOpenId;
-                setResetOpenId(null);
-                await handleResetSiteData(id);
-              }}
-              disabled={apiLoadingCount > 0}
-            >
-              Reset Data
             </button>
           </DialogFooter>
         </DialogContent>

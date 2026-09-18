@@ -5,6 +5,11 @@ import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import GallonsBarChart, { GallonsPoint } from './GallonsBarChart';
 import LiquidLevelAreaChart from './LiquidLevelAreaChart';
 import LiquidLevelBarChart from './LiquidLevelBarChart';
@@ -13,6 +18,8 @@ import HistoryTable from './HistoryTable';
 import PumpSettingsTable from './PumpSettingsTable';
 import { formatUtcAsEastern, parsePumpTimestampMs } from '@/utils/datetime';
 import { ADDON_LABELS, AddonKey, normalizeAddons, readUserAddons } from '@/utils/addons';
+import toast from 'react-hot-toast';
+import { RotateCcw } from 'lucide-react';
 
 type Props = { deviceSerial: string; displayName?: string };
 type ChartType = 'bar' | 'trend';
@@ -37,6 +44,18 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
   const [auxMetric, setAuxMetric] = React.useState<AddonKey>('liquid_level');
   const [auxChartType, setAuxChartType] = React.useState<ChartType>('trend');
   const [auxSeries, setAuxSeries] = React.useState<Record<string, SeriesPoint[]>>({});
+  const [resetOpen, setResetOpen] = React.useState(false);
+  const [resetting, setResetting] = React.useState(false);
+  const [dataEpoch, setDataEpoch] = React.useState(0);
+
+  const isSuperAdmin = React.useMemo(() => {
+    try {
+      const r = String(localStorage.getItem('role') || '').trim().toLowerCase();
+      return r === 'admin' || r === 'system administrator' || r === 'system admin' || r === 'super admin';
+    } catch {
+      return false;
+    }
+  }, []);
 
   const [coreChartTypes, setCoreChartTypes] = React.useState<Record<CoreMetricKey, ChartType>>({
     gallons: 'bar',
@@ -171,7 +190,41 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
     return () => {
       ignore = true;
     };
-  }, [deviceSerial, days]);
+  }, [deviceSerial, days, dataEpoch]);
+
+  const handleResetDeviceData = async () => {
+    if (!isSuperAdmin || resetting) return;
+    setResetting(true);
+    try {
+      const token = (() => {
+        try {
+          const m = document.cookie.match(/(?:^|; )AuthToken=([^;]+)/);
+          return m ? decodeURIComponent(m[1]) : null;
+        } catch {
+          return null;
+        }
+      })();
+      const res = await fetch(`/admin/api/devices/${encodeURIComponent(deviceSerial)}/reset-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || json?.message || 'Failed to reset pump data');
+      const d = json?.deleted || {};
+      toast.success(
+        `Data reset for ${wellLabel}: history ${d.pump_data ?? 0}, settings ${d.pump_settings ?? 0}`
+      );
+      setResetOpen(false);
+      setDataEpoch((n) => n + 1);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to reset pump data');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleTimeframeChange = (event: SelectChangeEvent) => {
     setTimeframe(event.target.value as 'day' | 'week' | 'month' | '');
@@ -287,29 +340,43 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
             {rangeLabel}
           </Typography>
         </Box>
-        <FormControl size="small" sx={{ minWidth: 170 }}>
-          <Select
-            inputProps={{ 'aria-label': 'Time Range' }}
-            value={timeframe}
-            size="small"
-            displayEmpty
-            sx={{ backgroundColor: 'white' }}
-            renderValue={(selected) => {
-              if (!selected) return <span style={{ color: '#9CA3AF' }}>Select time range</span>;
-              if (selected === 'day') return '1 Day';
-              if (selected === 'week') return '1 Week';
-              return '1 Month';
-            }}
-            onChange={handleTimeframeChange}
-          >
-            <MenuItem value="">
-              <em>Select time range</em>
-            </MenuItem>
-            <MenuItem value="day">1 Day</MenuItem>
-            <MenuItem value="week">1 Week</MenuItem>
-            <MenuItem value="month">1 Month</MenuItem>
-          </Select>
-        </FormControl>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          {isSuperAdmin && (
+            <Button
+              variant="outlined"
+              size="small"
+              color="warning"
+              startIcon={<RotateCcw className="w-4 h-4" />}
+              onClick={() => setResetOpen(true)}
+              sx={{ textTransform: 'none', backgroundColor: 'white' }}
+            >
+              Reset Data
+            </Button>
+          )}
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <Select
+              inputProps={{ 'aria-label': 'Time Range' }}
+              value={timeframe}
+              size="small"
+              displayEmpty
+              sx={{ backgroundColor: 'white' }}
+              renderValue={(selected) => {
+                if (!selected) return <span style={{ color: '#9CA3AF' }}>Select time range</span>;
+                if (selected === 'day') return '1 Day';
+                if (selected === 'week') return '1 Week';
+                return '1 Month';
+              }}
+              onChange={handleTimeframeChange}
+            >
+              <MenuItem value="">
+                <em>Select time range</em>
+              </MenuItem>
+              <MenuItem value="day">1 Day</MenuItem>
+              <MenuItem value="week">1 Week</MenuItem>
+              <MenuItem value="month">1 Month</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       <Grid container spacing={2}>
@@ -385,12 +452,31 @@ const DeviceOverview: React.FC<Props> = ({ deviceSerial, displayName }) => {
         )}
 
         <Grid item xs={12}>
-          <HistoryTable deviceSerial={deviceSerial} wellId={wellLabel} />
+          <HistoryTable key={`history-${deviceSerial}-${dataEpoch}`} deviceSerial={deviceSerial} wellId={wellLabel} />
         </Grid>
         <Grid item xs={12}>
-          <PumpSettingsTable deviceSerial={deviceSerial} wellId={wellLabel} />
+          <PumpSettingsTable key={`settings-${deviceSerial}-${dataEpoch}`} deviceSerial={deviceSerial} wellId={wellLabel} />
         </Grid>
       </Grid>
+
+      <Dialog open={resetOpen} onClose={() => !resetting && setResetOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Reset pump data?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            This permanently deletes history, settings history, and aux sensor data for{' '}
+            <strong>{wellLabel}</strong> only. Other pumps on the same site are not affected. The pump
+            stays registered — new readings appear when it reports again.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetOpen(false)} disabled={resetting}>
+            Cancel
+          </Button>
+          <Button variant="contained" color="warning" onClick={() => void handleResetDeviceData()} disabled={resetting}>
+            {resetting ? 'Resetting…' : 'Reset Data'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
