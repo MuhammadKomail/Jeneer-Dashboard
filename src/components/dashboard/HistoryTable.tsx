@@ -47,9 +47,12 @@ const baseColumns: Column<HistoryRow>[] = [
   { key: 'highAdc', header: 'High ADC' },
   { key: 'currentAdc', header: 'Current ADC' },
   { key: 'lowAdc', header: 'Low ADC' },
-  { key: 'gallons', header: 'Gallons', render: (r) => format2(r.gallons) },
-  { key: 'cycle', header: 'Cycles' },
-  { key: 'timeouts', header: 'Timeouts' },
+  { key: 'totalGallons', header: 'Total Gallons', render: (r) => format2(r.totalGallons) },
+  { key: 'gallons', header: 'Gallons (interval)', render: (r) => format2(r.gallons) },
+  { key: 'totalCycles', header: 'Total Cycles' },
+  { key: 'cycle', header: 'Cycles (interval)' },
+  { key: 'totalTimeouts', header: 'Total Timeouts' },
+  { key: 'timeouts', header: 'Timeouts (interval)' },
 ];
 
 const batteryColumn: Column<HistoryRow> = {
