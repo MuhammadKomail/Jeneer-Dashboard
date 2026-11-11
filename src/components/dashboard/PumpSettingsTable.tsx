@@ -16,6 +16,7 @@ import {
   parsePumpTimeSeconds,
   PUMP_TIME_LIMITS,
 } from '@/utils/pump-setting-limits';
+import { canEditPumpSettings } from '@/utils/addons';
 
 type SettingRow = {
   id: string;
@@ -74,6 +75,14 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
     value: string;
   } | null>(null);
 
+  const canEdit = React.useMemo(() => {
+    try {
+      return canEditPumpSettings(localStorage.getItem('role'));
+    } catch {
+      return false;
+    }
+  }, []);
+
   const normalizeRows = React.useCallback((raw: any[]): SettingRow[] => {
     return raw.map((r: any, idx: number) => {
       const id = String(r?.id ?? r?.setting_id ?? r?.settingId ?? r?.settings_id ?? r?.ts ?? r?.timestamp ?? idx);
@@ -92,13 +101,14 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
   }, []);
 
   const startBulkEdit = (field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle', label: string) => {
+    if (!canEdit) return;
     const first = (rows && rows.length > 0) ? rows[0] : null;
     const initial = first ? String(first[field] ?? '') : '';
     setBulkEdit({ field, label, value: initial });
   };
 
   const saveBulkEdit = async () => {
-    if (!bulkEdit || !deviceSerial) return;
+    if (!bulkEdit || !deviceSerial || !canEdit) return;
     let nextVal: number;
     if (isPumpTimeField(bulkEdit.field)) {
       const parsed = parsePumpTimeSeconds(bulkEdit.field, bulkEdit.value);
@@ -156,6 +166,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
   };
 
   const headerWithEdit = React.useCallback((label: string, field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle') => {
+    if (!canEdit) return label;
     return (
       <div className="inline-flex items-center gap-2">
         <span>{label}</span>
@@ -173,7 +184,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
         </button>
       </div>
     );
-  }, [deviceSerial, saving, startBulkEdit]);
+  }, [canEdit, deviceSerial, saving, startBulkEdit]);
 
   const columns: Column<SettingRow>[] = React.useMemo(() => [
     { key: 'ts', header: 'Timestamp', render: (r) => formatPumpTimestamp(r.ts) },
@@ -337,7 +348,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
         />
       )}
 
-      <Dialog open={!!bulkEdit} onClose={() => !saving && setBulkEdit(null)} fullWidth maxWidth="xs">
+      <Dialog open={canEdit && !!bulkEdit} onClose={() => !saving && setBulkEdit(null)} fullWidth maxWidth="xs">
         <DialogTitle>Update {bulkEdit?.label}</DialogTitle>
         <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <TextField

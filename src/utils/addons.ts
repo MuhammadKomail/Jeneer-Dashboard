@@ -32,6 +32,11 @@ export function isAdminRole(role: unknown): boolean {
   return r === 'admin' || r === 'system administrator' || r === 'system admin' || r === 'super admin';
 }
 
+/** Admins and managers may change pump settings; plain users are view-only. */
+export function canEditPumpSettings(role: unknown): boolean {
+  return isAdminRole(role) || String(role || '').trim().toLowerCase() === 'manager';
+}
+
 export function readUserAddons(): AddonKey[] {
   try {
     if (typeof window === 'undefined') return [];
