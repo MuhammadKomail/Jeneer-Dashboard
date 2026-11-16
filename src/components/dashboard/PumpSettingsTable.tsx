@@ -69,6 +69,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
   const [pageSize, setPageSize] = React.useState<number>(10);
   const [exporting, setExporting] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [reloadKey, setReloadKey] = React.useState(0);
   const [bulkEdit, setBulkEdit] = React.useState<{
     field: 'hold' | 'minAir' | 'maxAir' | 'ledOn' | 'purge' | 'maxIdle' | 'rest' | 'thres' | 'volPerCycle';
     label: string;
@@ -158,6 +159,8 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
 
       toast.success('Settings updated');
       setBulkEdit(null);
+      // Refetch so the Timestamp column shows the new last-updated time.
+      setReloadKey((k) => k + 1);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update settings');
     } finally {
@@ -223,7 +226,7 @@ const PumpSettingsTable: React.FC<{ deviceSerial?: string; wellId?: string }> = 
       } catch { if (!ignore) { setRows([]); setTotal(0); } }
     })();
     return () => { ignore = true; };
-  }, [deviceSerial, page, pageSize, normalizeRows, authHeaders]);
+  }, [deviceSerial, page, pageSize, normalizeRows, authHeaders, reloadKey]);
 
   const fetchAllRowsForExport = async (): Promise<SettingRow[]> => {
     if (!deviceSerial) return rows || [];
